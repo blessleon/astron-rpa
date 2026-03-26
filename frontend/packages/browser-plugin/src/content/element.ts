@@ -145,11 +145,11 @@ function elementFromPoint(x: number, y: number, docu: Document | ShadowRoot) {
 }
 
 function isUniqueIdFn(id: string) {
-  return id && !Utils.isSpecialCharacter(id) && document.querySelectorAll(`#${id}`).length === 1
+  return id && !Utils.isNumberString(id) && !Utils.isSpecialCharacter(id) && document.querySelectorAll(`#${id}`).length === 1
 }
 
 function isHighWeightClass(cls: string) {
-  return cls && !Utils.isSpecialCharacter(cls) && !Utils.isDynamicAttribute('class', cls)
+  return cls && !Utils.isNumberString(cls) && !Utils.isSpecialCharacter(cls) && !Utils.isDynamicAttribute('class', cls)
 }
 
 function isSvgElement(element: Element): boolean {
@@ -456,25 +456,22 @@ function getShadowElementsBySelector(selector: string) {
  * @returns The updated array of `ElementDirectory` objects with potentially modified 'index' attribute states.
  */
 function rebuildDirectory(originElement: HTMLElement, dirs: ElementDirectory[]) {
-  // Re-weight dirs again, try to uncheck the index of each node
   for (let i = dirs.length - 1; i >= 0; i--) {
     const dir = dirs[i]
-    const idAttr = dir.attrs.find(attr => attr.name === 'id' && attr.checked)
-    if (idAttr) {
-      dir.attrs.forEach((attr) => {
-        attr.checked = attr.name === 'id'
-      })
-    }
-    const indexAttr = dir.attrs.find(attr => attr.name === 'index')
-    if (indexAttr && indexAttr.checked) {
-      indexAttr.checked = false
-      const xpath = generateXPath(dirs)
-      const elements = getElementsByXpath(xpath)
-      const ignoreIndex = elements && elements.length === 1 && elements[0] === originElement
-      if (!ignoreIndex) {
-        indexAttr.checked = true
+    // try to uncheck index attr
+    const tryUncheckAttr = (attrName: string) => {
+      const attr = dir.attrs.find(a => a.name === attrName)
+      if (attr?.checked) {
+        attr.checked = false
+        const xpath = generateXPath(dirs)
+        const elements = getElementsByXpath(xpath)
+        const shouldKeepChecked = !(elements?.length === 1 && elements[0] === originElement)
+        attr.checked = shouldKeepChecked
       }
     }
+
+    tryUncheckAttr('index')
+    tryUncheckAttr('class')
   }
   return dirs
 }
