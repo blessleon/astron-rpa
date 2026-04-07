@@ -1,0 +1,18 @@
+atomic:
+  Md5.calculate_file_md5:
+    title: 计算文件MD5值
+    comment: 计算 @{file_path:文件路径} 的MD5值，超时时间 @{timeout:超时时间}秒，结果保存到 @{result:MD5值}
+    icon: icon-md5
+    helpManual: ''
+    inputList:
+      - key: file_path
+        title: 文件路径
+        tip: 需要计算MD5值的文件路径
+      - key: timeout
+        title: 超时时间
+        tip: 计算超时时间（秒），默认为30秒
+    outputList:
+      - key: result
+        title: MD5值
+        tip: 计算得到的文件MD5值（32位十六进制字符串）
+options: {}
