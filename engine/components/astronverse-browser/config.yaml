@@ -4,6 +4,8 @@ atomic:
     comment: 等待浏览器对象 @{browser_obj} 中元素 @{element_data} 的 @{ele_status}
     icon: wait-element-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -26,6 +28,8 @@ atomic:
     comment: 通过 @{button_type:点击} 的形式点击浏览器对象 @{browser_obj} 中的元素 @{element_data}
     icon: click-element-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -56,6 +60,8 @@ atomic:
       的形式输入内容 ，将执行结果输出至 @{form_input}
     icon: fill-input-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -99,6 +105,8 @@ atomic:
     comment: 鼠标悬停在浏览器对象 @{browser_obj} 中的元素 @{element_data} 上
     icon: mouse-hover-element-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -118,6 +126,8 @@ atomic:
     comment: 拾取浏览器对象 @{browser_obj} 的元素 @{element_data} 并输出为图片
     icon: pick-element-screenshot-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -143,6 +153,8 @@ atomic:
     comment: 获取浏览器对象 @{browser_obj} 的元素 @{element_data} 位置截图并输出为图片
     icon: element-position-screenshot-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -169,6 +181,8 @@ atomic:
       在浏览器对象 @{browser_obj} 中对 @{scrollbar_type} 进行 @{scroll_direction} 滚动
     icon: mouse-scroll-webpage
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -203,6 +217,8 @@ atomic:
     comment: 将网页元素 @{element_data} 置于可视区域
     icon: element-to-visible-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -224,6 +240,8 @@ atomic:
       @{get_similar_ele}
     icon: get-similar-elements-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -251,6 +269,8 @@ atomic:
       的相似元素，从起始项 @{start} 到结束项 @{end} 进行循环操作，输出循环项至 @{item} ，输出循环项位置 @{index} 
     icon: loop-similar-elements-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -285,6 +305,8 @@ atomic:
     comment: 获取浏览器对象 @{browser_obj} 网页中拾取的元素 @{element_data} 文本内容，并将结果输出至 @{data_pick}
     icon: get-element-text-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -306,6 +328,8 @@ atomic:
       @{percent_value} %
     icon: pick-slider-drag-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -334,6 +358,8 @@ atomic:
     comment: 在浏览器对象 @{browser_obj} 中获取下拉框 @{element_data}
     icon: get-dropdown-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -356,6 +382,8 @@ atomic:
     comment: 在浏览器对象 @{browser_obj} 中获取复选框 @{element_data}
     icon: get-checkbox-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -375,6 +403,8 @@ atomic:
     comment: 在浏览器对象 @{browser_obj} 中获取下拉框 @{element_data} ，通过 @{pattern} 选择匹配项
     icon: operate-dropdown-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -400,6 +430,8 @@ atomic:
     comment: 在浏览器对象 @{browser_obj} 中获取复选框 @{element_data} 后 @{checked_type}
     icon: operate-checkbox-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -419,6 +451,8 @@ atomic:
     comment: 在浏览器对象 @{browser_obj} 中获取 @{element_data} 并 @{operation_type}
     icon: element-operation-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -474,6 +508,8 @@ atomic:
     comment: 获取浏览器对象 @{browser_obj} 中的表格 @{element_data} ，将结果输出为 @{table_pick}
     icon: get-table-data-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -499,6 +535,8 @@ atomic:
     comment: 在指定的浏览器对象 @{browser_obj} 中抓取 @{batch_data} ，将结果输出为 @{table_pick}
     icon: data-scraping-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -562,6 +600,8 @@ atomic:
       @{element_obj}
     icon: get-element-object-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -586,6 +626,8 @@ atomic:
       @{relative_type}，将结果输出为元素对象 @{element_obj}
     icon: get-related-elements-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -623,6 +665,8 @@ atomic:
     comment: 浏览器对象 @{browser_obj} 中元素 @{element_data} 是否存在
     icon: wait-element-web
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -641,6 +685,9 @@ atomic:
       ，执行JavaScript，脚本执行结果保存至 @{program_script}
     icon: js-script
     helpManual: ''
+    path:
+      - /script
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -672,6 +719,8 @@ atomic:
     comment: 打开 @{browser_type:浏览器} 并进入初始网址 @{url:网址} ，将结果输出为浏览器对象 @{web_open}
     icon: open-browser
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: url
         title: 初始网址
@@ -706,6 +755,8 @@ atomic:
     comment: 关闭浏览器对象 @{browser_obj}
     icon: close-browser
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -716,6 +767,8 @@ atomic:
     comment: 设置浏览器对象 @{browser_obj} 的 @{url} 的Cookie名称 @{cookie_name} 的值为 @{cookie_val}
     icon: set-cookie
     helpManual: ''
+    path:
+      - /web/cookie
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -746,6 +799,8 @@ atomic:
       @{get_cookie}
     icon: get-cookie
     helpManual: ''
+    path:
+      - /web/cookie
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -771,6 +826,8 @@ atomic:
     comment: 清除浏览器对象 @{browser_obj} @{url} 的Cookie数据
     icon: clear-cookie
     helpManual: ''
+    path:
+      - /web/cookie
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -790,6 +847,8 @@ atomic:
     comment: 打开浏览器对象 @{browser_obj} 并进入网址 @{new_tab_url} ，将结果输出为浏览器对象 @{web_new_page}
     icon: open-new-webpage
     helpManual: ''
+    path:
+      - /web/page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -809,6 +868,8 @@ atomic:
     comment: 通过 @{switch_type} 的匹配方式切换到浏览器对象 @{browser_obj} 中的指定标签页
     icon: switch-existing-tab
     helpManual: ''
+    path:
+      - /web/page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -831,6 +892,8 @@ atomic:
     comment: 等待浏览器对象 @{browser_obj} 中页面加载完成
     icon: wait-page-load
     helpManual: ''
+    path:
+      - /web/page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -844,6 +907,8 @@ atomic:
     comment: 停止加载网页 @{browser_obj}
     icon: stop-loading-page
     helpManual: ''
+    path:
+      - /web/page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -854,6 +919,8 @@ atomic:
     comment: 刷新当前网页 @{browser_obj}
     icon: refresh-current-page
     helpManual: ''
+    path:
+      - /web/page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -864,6 +931,8 @@ atomic:
     comment: 关闭浏览器对象 @{browser_obj} 的当前网页
     icon: close-webpage
     helpManual: ''
+    path:
+      - /web/page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -877,6 +946,8 @@ atomic:
     comment: 将浏览器对象 @{browser_obj} 截图，并保存至路径 @{web_screen}
     icon: webpage-screenshot
     helpManual: ''
+    path:
+      - /web/page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -902,6 +973,8 @@ atomic:
     comment: 浏览器对象 @{browser_obj} 的当前网页前进
     icon: webpage-forward
     helpManual: ''
+    path:
+      - /web/page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -912,6 +985,8 @@ atomic:
     comment: 浏览器对象 @{browser_obj} 的当前网页后退
     icon: webpage-backward
     helpManual: ''
+    path:
+      - /web/page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -922,6 +997,8 @@ atomic:
     comment: 获取已经打开的浏览器软件 @{browser_type} 的浏览器对象，并将结果输出至 @{browser_obj}
     icon: get-open-browser-objects
     helpManual: ''
+    path:
+      - /web
     inputList:
       - key: browser_type
         title: 浏览器类型
@@ -935,6 +1012,8 @@ atomic:
     comment: 获取浏览器对象 @{browser_obj} 的URL值，并将结果输出至 @{get_url}
     icon: get-webpage-url
     helpManual: ''
+    path:
+      - /web/page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -948,6 +1027,8 @@ atomic:
     comment: 获取浏览器对象 @{browser_obj} 的标题，并将结果输出至 @{get_page_title}
     icon: get-webpage-title
     helpManual: ''
+    path:
+      - /web/page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -961,6 +1042,8 @@ atomic:
     comment: 获取浏览器对象 @{browser_obj} 当前标签页的唯一ID，并将结果输出至 @{get_tab_id}
     icon: get-current-tab-id
     helpManual: ''
+    path:
+      - /web/page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -974,6 +1057,8 @@ atomic:
     comment: 在网页中点击 @{element_data||link_str} 下载，将其保存至 @{save_path}
     icon: file-download-web
     helpManual: ''
+    path:
+      - /web/file
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -1014,6 +1099,8 @@ atomic:
     comment: 在网页中点击 @{element_data} ，在弹出的文件选择对话框中输入要上传的文件路径 @{upload_path}
     icon: file-upload-web
     helpManual: ''
+    path:
+      - /web/file
     inputList:
       - key: browser_obj
         title: 浏览器对象
