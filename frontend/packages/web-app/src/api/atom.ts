@@ -37,7 +37,6 @@ export async function getNewAtomDesc(key: string): Promise<RPA.Atom> {
     toast: false,
   })
   const atom = res.data && res.data.length > 0 ? res.data[0] : {}
-  const { atomContent = '{}' } = atom as any
   return JSON.parse(atom?.atomContent ?? '{}')
 }
 
