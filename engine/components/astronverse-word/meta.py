@@ -21,6 +21,6 @@ if __name__ == "__main__":
     typesMg.register_types(DocumentObject, version=get_version(), channel="global", template="Word对象")
     typesMg.meta()
 
-    treeMg.load_node_config_from_yaml("../../../resources/meta/tree_config.yaml")
+    treeMg.load_node_config_from_frame_json("../../../resources/meta/tree_frame.json")
     treeMg.build_from_meta_and_config("meta.json", "config.yaml")
     treeMg.meta("tree.json")

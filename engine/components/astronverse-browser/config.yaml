@@ -1,11 +1,62 @@
 atomic:
+  BrowserSoftware.browser_open:
+    title: 打开浏览器
+    comment: 打开 @{browser_type:浏览器} 并进入初始网址 @{url:网址} ，将结果输出为浏览器对象 @{web_open}
+    icon: open-browser
+    helpManual: ''
+    path:
+      - /atomicTree/web
+    inputList:
+      - key: url
+        title: 初始网址
+        tip: 初始网址
+      - key: browser_type
+        title: 浏览器类型
+        tip: 选择浏览器类型,需安装星辰RPA插件实现网页自动化,路径：设置-插件安装
+      - key: browser_abs_path
+        title: 浏览器路径
+        tip: 浏览器软件安装路径
+      - key: open_args
+        title: 浏览器启动参数
+        tip: 浏览器启动参数，比如--incognito
+      - key: open_with_incognito
+        title: 使用隐私模式
+        tip: 请提前将浏览器中“星火星辰RPA插件”详情设置为"在无痕模式下启用"
+      - key: wait_load_success
+        title: 等待网页加载完成
+        tip: ''
+      - key: timeout
+        title: 加载延时时间（秒）
+        tip: ''
+      - key: timeout_handle_type
+        title: 延时超时后执行
+        tip: 延时处理方式，终止即停止网页加载，跳过即跳过等待加载，不影响网页加载
+    outputList:
+      - key: web_open
+        title: 浏览器对象
+        tip: 输出打开的浏览器对象,使用此网页对象可实现网页自动化
+  BrowserSoftware.get_current_obj:
+    title: 获取已打开的浏览器对象
+    comment: 获取已经打开的浏览器软件 @{browser_type} 的浏览器对象，并将结果输出至 @{browser_obj}
+    icon: get-open-browser-objects
+    helpManual: ''
+    path:
+      - /atomicTree/web
+    inputList:
+      - key: browser_type
+        title: 浏览器类型
+        tip: 选择该浏览器对象所在的浏览器类型
+    outputList:
+      - key: browser_obj
+        title: 浏览器对象
+        tip: 保存获取的浏览器对象,使用此对象进行网页自动化操作
   BrowserElement.wait_element:
     title: 等待元素（web）
     comment: 等待浏览器对象 @{browser_obj} 中元素 @{element_data} 的 @{ele_status}
     icon: wait-element-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -23,13 +74,31 @@ atomic:
       - key: wait_element
         title: 等待结果
         tip: 输出元素是否出现/消失，出现/消失为true，反之为false
+  BrowserElement.element_exist:
+    title: 元素是否存在（web）
+    comment: 浏览器对象 @{browser_obj} 中元素 @{element_data} 是否存在
+    icon: wait-element-web
+    helpManual: ''
+    path:
+      - /atomicTree/web
+    inputList:
+      - key: browser_obj
+        title: 浏览器对象
+        tip: 选择指定的网页元素所在的浏览器对象
+      - key: element_data
+        title: 选择元素
+        tip: 拾取需要等待的网页元素
+    outputList:
+      - key: element_exist
+        title: 元素存在/不存在
+        tip: 输出元素是否存在，存在为True，不存在为False
   BrowserElement.click:
     title: 点击元素（web）
     comment: 通过 @{button_type:点击} 的形式点击浏览器对象 @{browser_obj} 中的元素 @{element_data}
     icon: click-element-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -55,13 +124,12 @@ atomic:
     outputList: []
   BrowserElement.input:
     title: 填写输入框（web）
-    comment: >-
-      在指定的浏览器对象 @{browser_obj} 中拾取输入框 @{element_data} ，以 @{fill_type:键盘输入/剪贴板输入}
+    comment: 在指定的浏览器对象 @{browser_obj} 中拾取输入框 @{element_data} ，以 @{fill_type:键盘输入/剪贴板输入}
       的形式输入内容 ，将执行结果输出至 @{form_input}
     icon: fill-input-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -106,7 +174,7 @@ atomic:
     icon: mouse-hover-element-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -127,7 +195,7 @@ atomic:
     icon: pick-element-screenshot-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -154,7 +222,7 @@ atomic:
     icon: element-position-screenshot-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -177,12 +245,11 @@ atomic:
         tip: ''
   BrowserElement.scroll:
     title: 网页滚动
-    comment: >-
-      在浏览器对象 @{browser_obj} 中对 @{scrollbar_type} 进行 @{scroll_direction} 滚动
+    comment: 在浏览器对象 @{browser_obj} 中对 @{scrollbar_type} 进行 @{scroll_direction} 滚动
     icon: mouse-scroll-webpage
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web/web.page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -218,7 +285,7 @@ atomic:
     icon: element-to-visible-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -235,13 +302,11 @@ atomic:
     outputList: []
   BrowserElement.similar:
     title: 获取相似元素列表（web）
-    comment: >-
-      获取浏览器对象 @{browser_obj} 中与拾取到的元素 @{element_data} 相似的元素，并将相似元素数组输出至
-      @{get_similar_ele}
+    comment: 获取浏览器对象 @{browser_obj} 中与拾取到的元素 @{element_data} 相似的元素，并将相似元素数组输出至 @{get_similar_ele}
     icon: get-similar-elements-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -264,13 +329,13 @@ atomic:
         tip: ''
   BrowserElement.loop_similar:
     title: 循环相似元素列表（web）
-    comment: >-
-      获取浏览器对象 @{browser_obj} 中元素 @{element_data}
-      的相似元素，从起始项 @{start} 到结束项 @{end} 进行循环操作，输出循环项至 @{item} ，输出循环项位置 @{index} 
+    comment: '获取浏览器对象 @{browser_obj} 中元素 @{element_data} 的相似元素，从起始项 @{start} 到结束项
+      @{end} 进行循环操作，输出循环项至 @{item} ，输出循环项位置 @{index} '
     icon: loop-similar-elements-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/code/for
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -306,7 +371,7 @@ atomic:
     icon: get-element-text-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -323,13 +388,12 @@ atomic:
         tip: 将获取到的文本内容输出至变量
   BrowserElement.slider_hover:
     title: 拾取滑块拖拽（web）
-    comment: >-
-      将滑块 @{element_slider} 从 @{drag_type} 向 @{drag_direction} 拖拽
-      @{percent_value} %
+    comment: 将滑块 @{element_slider} 从 @{drag_type} 向 @{drag_direction} 拖拽 @{percent_value}
+      %
     icon: pick-slider-drag-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -359,7 +423,7 @@ atomic:
     icon: get-dropdown-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -383,7 +447,7 @@ atomic:
     icon: get-checkbox-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -404,7 +468,7 @@ atomic:
     icon: operate-dropdown-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -431,7 +495,7 @@ atomic:
     icon: operate-checkbox-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -452,7 +516,7 @@ atomic:
     icon: element-operation-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -509,7 +573,7 @@ atomic:
     icon: get-table-data-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -536,7 +600,7 @@ atomic:
     icon: data-scraping-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -558,7 +622,7 @@ atomic:
         tip: 拾取需要翻页的元素
       - key: simulate_flag
         title: 模拟人工点击
-        tip: 
+        tip: null
       - key: button_type
         title: 点击键位
         tip: 选择模拟鼠标点击的方式
@@ -595,13 +659,11 @@ atomic:
         tip: 输出保存的表格路径
   BrowserElement.create_element:
     title: 获取元素对象（web）
-    comment: >-
-      在指定的浏览器对象 @{browser_obj} 中根据 @{locate_type} 获取元素对象 ，将结果输出为元素对象
-      @{element_obj}
+    comment: 在指定的浏览器对象 @{browser_obj} 中根据 @{locate_type} 获取元素对象 ，将结果输出为元素对象 @{element_obj}
     icon: get-element-object-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -621,13 +683,12 @@ atomic:
         tip: 输出元素对象，结果为单个对象或列表
   BrowserElement.get_relative_element:
     title: 获取关联元素（web）
-    comment: >-
-      在指定的浏览器对象 @{browser_obj} 中获取 @{element_data} 关联的
-      @{relative_type}，将结果输出为元素对象 @{element_obj}
+    comment: 在指定的浏览器对象 @{browser_obj} 中获取 @{element_data} 关联的 @{relative_type}，将结果输出为元素对象
+      @{element_obj}
     icon: get-related-elements-web
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -660,34 +721,14 @@ atomic:
       - key: element_obj
         title: 元素对象
         tip: 输出元素对象，结果为单个对象或列表
-  BrowserElement.element_exist:
-    title: 元素是否存在（web）
-    comment: 浏览器对象 @{browser_obj} 中元素 @{element_data} 是否存在
-    icon: wait-element-web
-    helpManual: ''
-    path:
-      - /web
-    inputList:
-      - key: browser_obj
-        title: 浏览器对象
-        tip: 选择指定的网页元素所在的浏览器对象
-      - key: element_data
-        title: 选择元素
-        tip: 拾取需要等待的网页元素
-    outputList:
-      - key: element_exist
-        title: 元素存在/不存在
-        tip: 输出元素是否存在，存在为True，不存在为False
   BrowserScript.js_run:
     title: Js脚本
-    comment: >-
-      通过 @{input_type:在线编辑/外部导入方式} 编辑脚本内容 @{content||file_path}
-      ，执行JavaScript，脚本执行结果保存至 @{program_script}
+    comment: 通过 @{input_type:在线编辑/外部导入方式} 编辑脚本内容 @{content||file_path} ，执行JavaScript，脚本执行结果保存至
+      @{program_script}
     icon: js-script
     helpManual: ''
     path:
-      - /script
-      - /web
+      - /atomicTree/script
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -714,49 +755,13 @@ atomic:
       - key: program_script
         title: 执行结果
         tip: ''
-  BrowserSoftware.browser_open:
-    title: 打开浏览器
-    comment: 打开 @{browser_type:浏览器} 并进入初始网址 @{url:网址} ，将结果输出为浏览器对象 @{web_open}
-    icon: open-browser
-    helpManual: ''
-    path:
-      - /web
-    inputList:
-      - key: url
-        title: 初始网址
-        tip: 初始网址
-      - key: browser_type
-        title: 浏览器类型
-        tip: 选择浏览器类型,需安装星辰RPA插件实现网页自动化,路径：设置-插件安装
-      - key: browser_abs_path
-        title: 浏览器路径
-        tip: 浏览器软件安装路径
-      - key: open_args
-        title: 浏览器启动参数
-        tip: 浏览器启动参数，比如--incognito
-      - key: open_with_incognito
-        title: 使用隐私模式
-        tip: 请提前将浏览器中“星火星辰RPA插件”详情设置为"在无痕模式下启用"
-      - key: wait_load_success
-        title: 等待网页加载完成
-        tip: ''
-      - key: timeout
-        title: 加载延时时间（秒）
-        tip: ''
-      - key: timeout_handle_type
-        title: 延时超时后执行
-        tip: 延时处理方式，终止即停止网页加载，跳过即跳过等待加载，不影响网页加载
-    outputList:
-      - key: web_open
-        title: 浏览器对象
-        tip: 输出打开的浏览器对象,使用此网页对象可实现网页自动化
   BrowserSoftware.browser_close:
     title: 关闭浏览器
     comment: 关闭浏览器对象 @{browser_obj}
     icon: close-browser
     helpManual: ''
     path:
-      - /web
+      - /atomicTree/web
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -768,7 +773,7 @@ atomic:
     icon: set-cookie
     helpManual: ''
     path:
-      - /web/cookie
+      - /atomicTree/web/web.cookie
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -794,13 +799,11 @@ atomic:
         tip: ''
   BrowserSoftware.get_cookies:
     title: 获取Cookie
-    comment: >-
-      获取浏览器对象 @{browser_obj} 的 @{url} 的Cookie名称 @{cookie_name} 的值，输出至
-      @{get_cookie}
+    comment: 获取浏览器对象 @{browser_obj} 的 @{url} 的Cookie名称 @{cookie_name} 的值，输出至 @{get_cookie}
     icon: get-cookie
     helpManual: ''
     path:
-      - /web/cookie
+      - /atomicTree/web/web.cookie
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -827,7 +830,7 @@ atomic:
     icon: clear-cookie
     helpManual: ''
     path:
-      - /web/cookie
+      - /atomicTree/web/web.cookie
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -848,7 +851,7 @@ atomic:
     icon: open-new-webpage
     helpManual: ''
     path:
-      - /web/page
+      - /atomicTree/web/web.page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -869,7 +872,7 @@ atomic:
     icon: switch-existing-tab
     helpManual: ''
     path:
-      - /web/page
+      - /atomicTree/web/web.page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -893,7 +896,7 @@ atomic:
     icon: wait-page-load
     helpManual: ''
     path:
-      - /web/page
+      - /atomicTree/web/web.page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -908,7 +911,7 @@ atomic:
     icon: stop-loading-page
     helpManual: ''
     path:
-      - /web/page
+      - /atomicTree/web/web.page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -920,7 +923,7 @@ atomic:
     icon: refresh-current-page
     helpManual: ''
     path:
-      - /web/page
+      - /atomicTree/web/web.page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -932,7 +935,7 @@ atomic:
     icon: close-webpage
     helpManual: ''
     path:
-      - /web/page
+      - /atomicTree/web/web.page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -947,7 +950,7 @@ atomic:
     icon: webpage-screenshot
     helpManual: ''
     path:
-      - /web/page
+      - /atomicTree/web/web.page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -974,7 +977,7 @@ atomic:
     icon: webpage-forward
     helpManual: ''
     path:
-      - /web/page
+      - /atomicTree/web/web.page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -986,34 +989,19 @@ atomic:
     icon: webpage-backward
     helpManual: ''
     path:
-      - /web/page
+      - /atomicTree/web/web.page
     inputList:
       - key: browser_obj
         title: 浏览器对象
         tip: 选择要网页后退所在的浏览器对象
     outputList: []
-  BrowserSoftware.get_current_obj:
-    title: 获取已打开的浏览器对象
-    comment: 获取已经打开的浏览器软件 @{browser_type} 的浏览器对象，并将结果输出至 @{browser_obj}
-    icon: get-open-browser-objects
-    helpManual: ''
-    path:
-      - /web
-    inputList:
-      - key: browser_type
-        title: 浏览器类型
-        tip: 选择该浏览器对象所在的浏览器类型
-    outputList:
-      - key: browser_obj
-        title: 浏览器对象
-        tip: 保存获取的浏览器对象,使用此对象进行网页自动化操作
   BrowserSoftware.get_current_url:
     title: 获取网页URL
     comment: 获取浏览器对象 @{browser_obj} 的URL值，并将结果输出至 @{get_url}
     icon: get-webpage-url
     helpManual: ''
     path:
-      - /web/page
+      - /atomicTree/web/web.page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -1028,7 +1016,7 @@ atomic:
     icon: get-webpage-title
     helpManual: ''
     path:
-      - /web/page
+      - /atomicTree/web/web.page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -1043,7 +1031,7 @@ atomic:
     icon: get-current-tab-id
     helpManual: ''
     path:
-      - /web/page
+      - /atomicTree/web/web.page
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -1058,7 +1046,7 @@ atomic:
     icon: file-download-web
     helpManual: ''
     path:
-      - /web/file
+      - /atomicTree/web/web.file
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -1100,7 +1088,7 @@ atomic:
     icon: file-upload-web
     helpManual: ''
     path:
-      - /web/file
+      - /atomicTree/web/web.file
     inputList:
       - key: browser_obj
         title: 浏览器对象
@@ -1116,9 +1104,9 @@ atomic:
         tip: 模拟人工点击是模拟人为操作方式点击，否则将根据拾取元素的自动化接口进行点击
 options:
   WaitElementForStatusFlag:
-    - value: 'y'
+    - value: y
       label: 出现
-    - value: 'n'
+    - value: n
       label: 消失
   Bool:
     - value: true

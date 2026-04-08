@@ -5,7 +5,7 @@ atomic:
     icon: call-dify-workflow
     helpManual: ''
     path:
-      - /ai/ai_workflow
+      - /atomicTreeExtend/ai/ai_workflow
     inputList:
       - key: user
         title: 用户名
@@ -42,7 +42,7 @@ atomic:
     icon: call-dify-workflow
     helpManual: ''
     path:
-      - /ai/ai_workflow
+      - /atomicTreeExtend/ai/ai_workflow
     inputList:
       - key: user
         title: 用户名
@@ -119,7 +119,7 @@ atomic:
     icon: call-dify-workflow
     helpManual: ''
     path:
-      - /ai/ai_workflow
+      - /atomicTreeExtend/ai/ai_workflow
     inputList:
       - key: astron_workflow
         title: 星辰Agent流程配置
@@ -135,7 +135,7 @@ atomic:
     icon: multi-chat
     helpManual: ''
     path:
-      - /ai/llm_capability
+      - /atomicTreeExtend/ai/llm_capability
     inputList:
       - key: is_save
         title: 保存会话
@@ -163,7 +163,7 @@ atomic:
     icon: knowledge-qa
     helpManual: ''
     path:
-      - /ai/llm_capability
+      - /atomicTreeExtend/ai/llm_capability
     inputList:
       - key: file_path
         title: 文件路径
@@ -185,7 +185,7 @@ atomic:
     icon: single-chat
     helpManual: ''
     path:
-      - /ai/llm_capability
+      - /atomicTreeExtend/ai/llm_capability
     inputList:
       - key: model_select
         title: 模型选择
@@ -207,7 +207,7 @@ atomic:
     icon: contract-element-extraction
     helpManual: ''
     path:
-      - /ai/business_ai
+      - /atomicTreeExtend/ai/business_ai
     inputList:
       - key: contract_type
         title: 输入合同方式
@@ -238,7 +238,7 @@ atomic:
     icon: topic-expand
     helpManual: ''
     path:
-      - /ai/llm_capability
+      - /atomicTreeExtend/ai/llm_capability
     inputList:
       - key: model_select
         title: 模型选择
@@ -260,7 +260,7 @@ atomic:
     icon: paragraph-expand
     helpManual: ''
     path:
-      - /ai/llm_capability
+      - /atomicTreeExtend/ai/llm_capability
     inputList:
       - key: model_select
         title: 模型选择
@@ -282,7 +282,7 @@ atomic:
     icon: paragraph-abbreviate
     helpManual: ''
     path:
-      - /ai/llm_capability
+      - /atomicTreeExtend/ai/llm_capability
     inputList:
       - key: model_select
         title: 模型选择
@@ -304,7 +304,7 @@ atomic:
     icon: topic-expand
     helpManual: ''
     path:
-      - /ai/llm_capability
+      - /atomicTreeExtend/ai/llm_capability
     inputList:
       - key: model_select
         title: 模型选择
@@ -341,7 +341,7 @@ atomic:
     icon: topic-expand
     helpManual: ''
     path:
-      - /ai/llm_capability
+      - /atomicTreeExtend/ai/llm_capability
     inputList:
       - key: model_select
         title: 模型选择
@@ -369,7 +369,7 @@ atomic:
     icon: topic-expand
     helpManual: ''
     path:
-      - /ai/llm_capability
+      - /atomicTreeExtend/ai/llm_capability
     inputList:
       - key: model_select
         title: 模型选择
@@ -397,7 +397,7 @@ atomic:
     icon: topic-expand
     helpManual: ''
     path:
-      - /ai/llm_capability
+      - /atomicTreeExtend/ai/llm_capability
     inputList:
       - key: model_select
         title: 模型选择
@@ -425,7 +425,7 @@ atomic:
     icon: topic-expand
     helpManual: ''
     path:
-      - /ai/llm_capability
+      - /atomicTreeExtend/ai/llm_capability
     inputList:
       - key: input_mode
         title: 输入方式
@@ -455,7 +455,7 @@ atomic:
     icon: image-generation
     helpManual: ''
     path:
-      - /ai/image
+      - /atomicTreeExtend/ai/image
     inputList:
       - key: model_select
         title: 模型选择
@@ -485,7 +485,7 @@ atomic:
     icon: image-understanding
     helpManual: ''
     path:
-      - /ai/image
+      - /atomicTreeExtend/ai/image
     inputList:
       - key: model_select
         title: 模型选择
@@ -507,7 +507,7 @@ atomic:
     icon: job-keyword-generation
     helpManual: ''
     path:
-      - /ai/business_ai
+      - /atomicTreeExtend/ai/business_ai
     inputList:
       - key: job_name
         title: 职位名称
@@ -532,7 +532,7 @@ atomic:
     icon: resume-scoring
     helpManual: ''
     path:
-      - /ai/business_ai
+      - /atomicTreeExtend/ai/business_ai
     inputList:
       - key: job_name
         title: 职位名称
@@ -652,22 +652,22 @@ options:
     - value: xopdeepseekocr
       label: DeepSeek_OCR
   AspectRatio:
-    - value: "1:1"
-      label: "1:1"
-    - value: "3:4"
-      label: "3:4"
-    - value: "4:3"
-      label: "4:3"
-    - value: "4:7"
-      label: "4:7"
-    - value: "7:4"
-      label: "7:4"
-    - value: "9:16"
-      label: "9:16"
-    - value: "16:9"
-      label: "16:9"
+    - value: '1:1'
+      label: '1:1'
+    - value: '3:4'
+      label: '3:4'
+    - value: '4:3'
+      label: '4:3'
+    - value: '4:7'
+      label: '4:7'
+    - value: '7:4'
+      label: '7:4'
+    - value: '9:16'
+      label: '9:16'
+    - value: '16:9'
+      label: '16:9'
   ImageSize:
-    - value: "1024p"
-      label: "1024p"
-    - value: "720p"
-      label: "720p"
+    - value: 1024p
+      label: 1024p
+    - value: 720p
+      label: 720p

@@ -15,6 +15,6 @@ if __name__ == "__main__":
     atomicMg.register(Enterprise, version=get_version())
     atomicMg.meta()
 
-    treeMg.load_node_config_from_yaml("../../../resources/meta/tree_config.yaml")
+    treeMg.load_node_config_from_frame_json("../../../resources/meta/tree_frame.json")
     treeMg.build_from_meta_and_config("meta.json", "config.yaml")
     treeMg.meta("tree.json")
