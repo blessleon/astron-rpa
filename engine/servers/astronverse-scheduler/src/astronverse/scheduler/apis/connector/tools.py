@@ -5,6 +5,7 @@ import json
 import mimetypes
 import os
 import re
+from dataclasses import field
 
 from astronverse.scheduler.apis.response import ResCode, res_msg
 from astronverse.scheduler.core.schduler.venv import create_project_venv, get_project_venv
