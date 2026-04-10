@@ -182,7 +182,7 @@ Steps for frontend + backend joint debugging:
    cd engine
    uv run main_debug.py
    ```
-2. Enable `skip_engine_start` in the frontend config, then start the frontend dev server:
+2. Start the frontend dev server:
    ```bash
    cd frontend
    set PORT={route_port} && pnpm dev:desktop

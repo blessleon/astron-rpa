@@ -183,7 +183,7 @@ route_port=13159
    cd engine
    uv run main_debug.py
    ```
-2. 在前端工程中开启 `skip_engine_start` 配置后启动前端开发服务器：
+2. 在前端工程中启动前端开发服务器：
    ```bash
    cd frontend
    set PORT={route_port} && pnpm dev:desktop

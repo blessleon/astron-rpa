@@ -95,7 +95,7 @@ class Md5:
                     total_read += len(chunk)
             
             # 返回MD5十六进制字符串
-            return f"md5_hash: {md5_hash.hexdigest()}" 
+            return md5_hash.hexdigest()
             
         except BizException:
             raise

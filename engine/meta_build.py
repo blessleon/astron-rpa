@@ -14,7 +14,6 @@ components_dir = Path(current_dir, "components").resolve()
 folders = os.listdir(components_dir)
 selected_folders = folders.copy()
 
-print(f"parent {current_dir.parent}")
 # Output files
 # local_meta_file: aggregated meta.json from local component directories
 local_meta_file = os.path.join(current_dir, "rpaexternal/meta/local_meta.json")
@@ -156,6 +155,18 @@ class JsonUtils:
             return data
 
 
+class Translator:
+    """Class responsible for translating text using an external translation API"""
+
+    @staticmethod
+    def translate_json(file_path, target_language="en"):
+        """Translate text in a JSON file using an external translation API"""
+        with open(file_path, encoding="utf-8") as f:
+            data = json.load(f)
+        # todo
+        pass
+
+
 class MetaBuilder:
     """Class responsible for building the merged meta and tree structures from local component data"""
 
@@ -194,13 +205,10 @@ class MetaBuilder:
     # Step 2: Build merged meta and tree
     color_log("\n" + "=" * 60, "35")
     color_log("Step 2: Build Merged Meta and Tree", "35")
-    color_log("=" * 60, "35")
+    meta_list = local_manager.build_meta_list(local_meta)
+    meta_tree = local_manager.build_tree_config(local_tree, local_types)
 
-    choice = input("Build merged meta and tree? (y/n): ").strip().lower()
-    if choice == "y":
-        meta_list = local_manager.build_meta_list(local_meta)
-    else:
-        color_log("Skipping meta and tree build. Exiting.", "33")
+    # color_log("Step 3: ", "32")
 
 
 if __name__ == "__main__":
