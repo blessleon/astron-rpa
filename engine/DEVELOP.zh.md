@@ -17,8 +17,7 @@ engine/
 │   ├── astronverse-actionlib/   # 原子能力注册框架
 │   ├── astronverse-workflowlib/ # 工作流执行库
 │   └── ...
-├── main.py              # 生产启动入口
-├── main_debug.py        # 调试启动入口（含 meta 构建）
+├── main.py              # 调试启动入口（含 meta 构建）
 ├── meta_build.py        # meta/tree 配置构建脚本
 └── pyproject.toml       # 项目依赖声明
 ```
@@ -149,13 +148,13 @@ uv run meta_build.py
 
 ### 调试入口
 
-`main_debug.py` 是调试专用入口，启动时会：
+`main.py` 是调试专用入口，启动时会：
 1. 调用 `MetaBuilder` 重新构建全量 meta/tree 配置
 2. 启动调度器（scheduler），与前端建立 WebSocket 连接
 
 ```bash
 cd engine
-uv run main_debug.py
+uv run main.py
 ```
 3. 查看启动后的route_port，用于启动客户端连接引擎服务的连接端口。
 ```bash
@@ -181,7 +180,7 @@ route_port=13159
 1. 先启动 engine：
    ```bash
    cd engine
-   uv run main_debug.py
+   uv run main.py
    ```
 2. 在前端工程中启动前端开发服务器：
    ```bash

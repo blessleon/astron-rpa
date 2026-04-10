@@ -17,8 +17,7 @@ engine/
 │   ├── astronverse-actionlib/   # Atomic capability registration framework
 │   ├── astronverse-workflowlib/ # Workflow execution library
 │   └── ...
-├── main.py              # Production startup entry
-├── main_debug.py        # Debug startup entry (includes meta build)
+├── main.py              # Debug startup entry (includes meta build)
 ├── meta_build.py        # Meta/tree configuration build script
 └── pyproject.toml       # Project dependency declarations
 ```
@@ -149,13 +148,13 @@ Output:
 
 ### Debug Entry Point
 
-`main_debug.py` is the dedicated debug entry point. On startup it:
+`main.py` is the dedicated debug entry point. On startup it:
 1. Calls `MetaBuilder` to rebuild the full meta/tree configuration
 2. Starts the scheduler and establishes a WebSocket connection with the frontend
 
 ```bash
 cd engine
-uv run main_debug.py
+uv run main.py
 ```
 3. Check the started route_port, which is the port used by the client to connect to the engine service.
 ```bash
@@ -180,7 +179,7 @@ Steps for frontend + backend joint debugging:
 1. Start the engine first:
    ```bash
    cd engine
-   uv run main_debug.py
+   uv run main.py
    ```
 2. Start the frontend dev server:
    ```bash
