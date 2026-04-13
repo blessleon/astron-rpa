@@ -4,7 +4,7 @@ import sys
 import psutil
 from astronverse.scheduler.__main__ import main
 
-# from scripts.meta_build import MetaBuilder
+from scripts.meta_build import MetaBuilder
 
 
 def _kill_children():
@@ -21,7 +21,7 @@ def _kill_children():
 
 
 if __name__ == "__main__":
-    # MetaBuilder()
+    MetaBuilder()
     os.environ["DEBUG"] = "1"
     try:
         main()
