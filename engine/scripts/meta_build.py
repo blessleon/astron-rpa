@@ -80,6 +80,9 @@ class LocalManager:
             with open(meta_json_path, encoding="utf-8") as f:
                 data = json.load(f)
                 result.update(data)
+        with open(BASE_META_FILE, encoding="utf-8") as f:
+            base_meta = json.load(f)
+            result.update(base_meta)  # 基础 meta 放在最后，覆盖组件 meta 中的同名项
         color_log(f"Merged local meta items count: {len(result)}", "32")
         JsonUtils.save_to_file(result, LOCAL_META_FILE)
         return result
