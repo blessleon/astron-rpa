@@ -1,11 +1,10 @@
 <!-- @format -->
 
 <script lang="ts" setup>
-import { ref } from 'vue'
 import ConfigProvider from '@/components/ConfigProvider/index.vue'
 import { useHighlight } from './hooks/useHighlight'
+import CV from './CV.vue'
 
-const tooltipRef = ref<HTMLElement | null>(null)
 const {
   dpr,
   highlightRect,
@@ -16,14 +15,20 @@ const {
   tooltipPos,
   tagPosition,
   shortcuts,
+  highlightShow,
+  cvCropShow,
+  setPickStep
 } = useHighlight()
+
+window['setPickStep'] = setPickStep
+
 </script>
 
 <template>
   <ConfigProvider>
     <div class="highlight-overlay">
       <div
-        v-if="highlightRect.width > 0"
+        v-if="highlightShow"
         class="highlight-box"
         :style="{
         left: (highlightRect.x / dpr) + 'px',
@@ -35,7 +40,8 @@ const {
           {{ tagName }}
         </span>
       </div>
-      <div v-if="tooltipVisible" ref="tooltipRef" :class="`tooltip bg-bg-elevated ${tooltipPos === 'leftTop' ? 'tooltip-left-top' : 'tooltip-right-bottom'}`">
+      <CV v-if="cvCropShow"/>
+      <div v-if="tooltipVisible" :class="`tooltip bg-bg-elevated ${tooltipPos === 'leftTop' ? 'tooltip-left-top' : 'tooltip-right-bottom'}`">
         <!-- <div class="tooltip-item font-bold">{{ modeTitle }}</div> -->
         <div class="tooltip-item font-bold" v-for="(sc, i) in shortcuts" :key="i">
           <span class="short-title">{{ sc.title }}</span>
@@ -61,7 +67,7 @@ const {
   position: fixed;
   top: 0;
   left: 0;
-  pointer-events: none;
+  // pointer-events: none;
   background: transparent;
 }
 

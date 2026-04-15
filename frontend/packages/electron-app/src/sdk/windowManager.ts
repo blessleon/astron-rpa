@@ -225,6 +225,11 @@ class ElectronWindowManager implements WindowManager {
   async onWindowClose(callback: () => void) {
     ipcRenderer.on('window-close-confirm', (_ev, _arg) => callback?.())
   }
+  // window-set-mouse-ignore
+  async setMouseIgnore(ignore: boolean) {
+    ipcRenderer.send('window-set-mouse-ignore', ignore)
+  }
+
 }
 
 export default ElectronWindowManager

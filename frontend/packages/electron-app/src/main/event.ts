@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import { join } from 'node:path'
 
 import { BrowserWindow, app } from 'electron'
-import { clipboard, dialog, globalShortcut, ipcMain, screen, shell } from 'electron'
+import { clipboard, desktopCapturer, dialog, globalShortcut, ipcMain, screen, shell } from 'electron'
 import throttle from 'lodash/throttle'
 import { IPluginConfig } from '@rpa/shared'
 import { to } from 'await-to-js'
@@ -151,6 +151,13 @@ export function listenRender() {
   ipcMain.on('window-set-always-on-top', (event, alwaysOnTop) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     win?.setAlwaysOnTop(alwaysOnTop, 'pop-up-menu')
+  })
+
+  // window mouse ignore
+  ipcMain.on('window-set-mouse-ignore', (event, ignore) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (ignore) win?.setIgnoreMouseEvents(ignore, { forward: true })
+    else win?.setIgnoreMouseEvents(false)
   })
 
   // get-workarea
@@ -317,5 +324,35 @@ export function listenRender() {
 
   ipcMain.handle('save-user-setting', async (_event, setting) => {
     return saveSetting(setting)
+  })
+
+  // capture-screen: 隐藏当前窗口 → 截图 → 返回 base64 DataURL → 恢复显示
+  ipcMain.handle('capture-screen', async (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    win?.hide()
+    // 等待窗口完全隐藏，避免截图中出现遮罩
+    await new Promise<void>(resolve => setTimeout(resolve, 200))
+    try {
+      const display = screen.getPrimaryDisplay()
+      const scaleFactor = display.scaleFactor || 1
+      // 使用物理像素分辨率，避免高 DPI 下截图模糊
+      const width = Math.round(display.size.width * scaleFactor)
+      const height = Math.round(display.size.height * scaleFactor)
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width, height },
+      })
+      if (sources.length > 0) {
+        return sources[0].thumbnail.toDataURL()
+      }
+      return null
+    }
+    catch (err) {
+      logger.error('Failed to capture screen:', err)
+      return null
+    }
+    finally {
+      win?.show()
+    }
   })
 }

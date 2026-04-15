@@ -1,4 +1,5 @@
 export enum PickMode {
+  "" = 'normal',
   NORMAL = 'normal',
   SMART = 'smart',
   CV = 'cv',
@@ -7,6 +8,14 @@ export enum PickMode {
   POINT = "point",
   SIMILAR = "similar",
   BATCH = "batch",
+}
+
+export enum PickStep {
+  "" = 'default',
+  DEFAULT = 'default',
+  PICKING = 'picking',
+  PICKED = 'picked',
+  CROPPED = 'cropped',
 }
 
 export const PickTip = {

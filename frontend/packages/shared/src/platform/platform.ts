@@ -38,6 +38,7 @@ export interface WindowManager {
   onWindowResize: (callback: () => void) => Promise<() => void>
   onWindowClose: (callback: () => void) => void
   emitTo: (msg: WindowMessage) => Promise<any>
+  setMouseIgnore: (ignore: boolean) => void
 }
 
 export type WindowPosition = 'left_top' | 'right_top' | 'left_bottom' | 'right_bottom' | 'top_center' | 'center' | 'right_center' | 'fullscreen'
@@ -75,11 +76,13 @@ export interface CreateWindowOptions {
   maximizable?: boolean
   minimizable?: boolean
   closable?: boolean
+  hasShadow?: boolean
+  movable?: boolean
   kiosk?: boolean
   fullscreenable?: boolean
   simpleFullscreen?: boolean
-  mouseListen?: boolean
-  keyboardListen?: boolean
+  mouseIgnore?: boolean
+  keyboardIgnore?: boolean
 }
 
 // 窗口消息类型

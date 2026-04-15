@@ -22,8 +22,15 @@ export function sendElectronInfo(win: BrowserWindow) {
 }
 
 function createWindow(options: Electron.BrowserWindowConstructorOptions, label?: string) {
+  if (label && WindowStack.has(label)) {
+    logger.warn(`Window with label ${label} already exists, focusing it instead of creating a new one.`)
+    const win = WindowStack.get(label)
+    if (win) {
+      win.show()
+      return win
+    }
+  }
   const win = new BrowserWindow(options)
-
   if (label) {
     WindowStack.set(label, win)
   }
@@ -125,30 +132,23 @@ export function createSubWindow(options: CreateWindowOptions) {
   const window = createWindow(subWindowOptions, options.label)
   window.loadURL(url).then(() => sendElectronInfo(window)).catch(() => logger.error('Failed to load URL'))
 
-  if (options.mouseListen === false) {
+  if (options.mouseIgnore) {
     window.setIgnoreMouseEvents(true, { forward: true });
   }
-  if (options.keyboardListen === true) {
-    window.webContents.on('before-input-event', (event, input) => {
-      // input.type: 'keyUp' 或 'keyDown'
-      // input.key: 按键名称，如 'a', 'Enter', 'Control'
-      // input.code: 物理按键位置，如 'KeyA'
-      // input.control / input.shift / input.alt / input.meta: 修饰键状态
-
-      if (input.type === 'keyDown' && input.control ) {
-        console.log('按下了 Ctrl');
-        event.preventDefault();  // 阻止事件传递给页面，防止浏览器默认行为（如保存网页）
-        // 执行自定义逻辑
-      }
-    });
-  }
   window.on('ready-to-show', () => {
-    // window.openDevTools()
+    // window?.openDevTools()
     if (options?.show !== false) {
       window.show()
     }
     window.focus()
   })
+
+  window.on('closed', () => {
+    if (options.label) {
+      WindowStack.delete(options.label)
+    }
+  })
+
 
   return window
 }

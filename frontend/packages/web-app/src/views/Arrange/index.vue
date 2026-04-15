@@ -13,7 +13,7 @@ import { useCreateWindow } from './hook/useCreateWindow'
 
 const processStore = useProcessStore()
 const runningStore = useRunningStore()
-const { openHighlightWindow } = useCreateWindow()
+const { openHighlightWindow, closeHighlightWindow } = useCreateWindow()
 const route = useRoute()
 
 async function initByRoute() {
@@ -55,6 +55,7 @@ onUnmounted(async () => {
     return
   await stopPickServices({})
   isStart = false
+  closeHighlightWindow()
 })
 
 onBeforeUnmount(() => {
