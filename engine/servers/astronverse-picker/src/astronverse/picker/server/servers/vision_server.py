@@ -205,7 +205,7 @@ class VisionServer:
                         return "cancel"
                     if result == "shift":
                         hl.cv_initialize_sync("SHIFT")
-                        hl.cv_start_sync("vision_wait")
+                        # hl.cv_start_sync("vision_wait")
                         continue
                     if result is not None:
                         # 有目标 rect，进行 check_target
@@ -215,7 +215,7 @@ class VisionServer:
                             return pick_result
                         else:
                             # 目标获取失败，重新等待
-                            hl.cv_start_sync("vision_wait")
+                            # hl.cv_start_sync("vision_wait")
                             continue
 
                 time.sleep(0.05)
@@ -290,10 +290,15 @@ class VisionServer:
 
     def _run_validate(self, data: dict) -> str | None:
         """验证视觉元素是否仍然存在于屏幕上"""
+        import json
         from astronverse.vision_picker.core.core import IPickCore
 
         try:
-            match_box = IPickCore.match_imgs(data, remote_addr="")
+            # data 是原始请求消息，cv 数据在 data["data"] 字段中（JSON 字符串）
+            cv_data = data.get("data")
+            if isinstance(cv_data, str):
+                cv_data = json.loads(cv_data)
+            match_box = IPickCore.match_imgs(cv_data, remote_addr="")
             if match_box:
                 return "valid"
             return "invalid"
@@ -312,18 +317,24 @@ class VisionServer:
         2. 通知 hl 画出 target 高亮并进入 designate 模式
         3. 请求 hl 截图 → 走锚点选取流程 → check_anchor → 返回结果
         """
+        import json
         from astronverse.vision_picker.core.core import IPickCore
 
         hl = self.svc.ws_server.hl
 
+        # data 是原始请求消息，cv 数据在 data["data"] 字段中（JSON 字符串）
+        cv_data = data.get("data")
+        if isinstance(cv_data, str):
+            cv_data = json.loads(cv_data)
+
         # Step 1: 校验目标是否还在
-        match_box = IPickCore.match_imgs(data, remote_addr="")
+        match_box = IPickCore.match_imgs(cv_data, remote_addr="")
         if not match_box:
             return None
 
         # Step 2: 通知 hl 进入 designate 模式并画出目标高亮
         from astronverse.picker import Rect
-        target_rect_data = data.get("pos", {})
+        target_rect_data = cv_data.get("pos", {})
         target_x = target_rect_data.get("self_x", 0)
         target_y = target_rect_data.get("self_y", 0)
         # match_box 格式: (left, top, right, bottom) 或 (x, y, w, h)

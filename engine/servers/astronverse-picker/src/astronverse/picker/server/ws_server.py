@@ -92,9 +92,14 @@ class WsServer:
             # 高亮通道
             self._add(ws)
             self._move(ws, "hl")
-        else:
+        elif "/cv_picker" in path:
+            # CV 拾取通道 - 匹配 /cv_picker/picker
             self._add(ws)
-        
+            self._move(ws, "vision")
+        else:
+            # 普通拾取通道 - 默认
+            self._add(ws)
+
         # 消息分发
         try:
             async for message in ws:
@@ -108,6 +113,12 @@ class WsServer:
                         if data.get("feedback_type") and self.svc.vision_server:
                             self.svc.vision_server.on_hl_feedback(data)
                         continue  # hl 消息不走 pick_type 路由
+
+                    # vision 通道：CV 拾取消息
+                    if ws in self.connections.get("vision", []):
+                        await self._import_vision_handler().dispatch(ws_server=self, ws=ws, data=data)
+                        continue
+
                     if data.get("pick_type", None):
                         # 拾取消息
                         pick_type = data.get("pick_type", None)
