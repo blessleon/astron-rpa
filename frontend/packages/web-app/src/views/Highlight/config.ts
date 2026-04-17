@@ -2,12 +2,13 @@ export enum PickMode {
   "" = 'normal',
   NORMAL = 'normal',
   SMART = 'smart',
-  CV = 'cv',
+  CV = 'vision_wait',
   WINDOW = 'window',
   ELEMENT = "element",
   POINT = "point",
   SIMILAR = "similar",
   BATCH = "batch",
+  VALIDATE = "validate",
 }
 
 export enum PickStep {
@@ -16,6 +17,14 @@ export enum PickStep {
   PICKING = 'picking',
   PICKED = 'picked',
   CROPPED = 'cropped',
+  SMART = 'smart',
+}
+
+export enum ShortCutKey {
+  CTRL = 'ctrl',
+  ALT = 'Alt',
+  SHIFT = 'Shift',
+  ESC = 'Escape',
 }
 
 export const PickTip = {
@@ -75,4 +84,29 @@ export const TipPosition = {
     bottom: '60px',
     right: '10px',
   }
+}
+
+
+export interface HighlightRect {
+  x: number
+  y: number
+  width: number
+  height: number
+  tag?: string
+}
+
+export interface DrawRect {
+  Left: number
+  Top: number
+  Right: number
+  Bottom: number
+  Msg?: string
+}
+
+export interface MessageType {
+  MouseX?: number
+  MouseY?: number
+  Boxes?: DrawRect[],
+  Type?: PickMode,
+  Operation: string
 }

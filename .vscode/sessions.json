@@ -1,0 +1,112 @@
+{
+  "$schema": "file:///C:/Users/gqzheng2/AppData/Local/gqwork/terminal-keeper.json",
+  "theme": "tribe",
+  "active": "default",
+  "activateOnStartup": false,
+  "keepExistingTerminals": false,
+  "sessions": {
+    "default": [
+      {
+        "name": "打包 全量客户端",
+        "autoExecuteCommands": true,
+        "icon": "file-zip",
+        "color": "terminal.ansiWhite",
+        "commands": [
+          "build.bat --python-exe=\"C:\\Users\\gqzheng2\\AppData\\Local\\Programs\\Python\\Python313\\python.exe\""
+        ]
+      },
+      {
+        "name": "打包 engine",
+        "autoExecuteCommands": false,
+        "icon": "archive",
+        "color": "terminal.ansiYellow",
+        "commands": [
+          "build.bat --python-exe=\"C:\\Users\\gqzheng2\\AppData\\Local\\Programs\\Python\\Python313\\python.exe\" --skip-frontend"
+        ]
+      },
+      {
+        "name": "格式化 engine",
+        "autoExecuteCommands": true,
+        "icon": "code",
+        "color": "terminal.ansiYellow",
+        "commands": [
+          "uv run --project engine --dev ruff format ./engine",
+          "uv run --project engine --dev ruff check --fix ./engine"
+        ]
+      },
+      {
+        "name": "格式化 单个组件",
+        "autoExecuteCommands": true,
+        "icon": "code",
+        "color": "terminal.ansiYellow",
+        "commands": [
+          "uv run --project engine --dev ruff format engine/shared/astronverse-browser-plugin",
+          "uv run --project engine --dev ruff check --fix ./engine/shared/astronverse-browser-plugin"
+        ]
+      },
+      {
+        "name": "打包 frontend",
+        "autoExecuteCommands": false,
+        "icon": "file-zip",
+        "color": "terminal.ansiRed",
+        "commands": [
+          "cd frontend && npm install && npm run build:desktop"
+        ]
+      },
+      {
+        "name": "运行 client",
+        "autoExecuteCommands": true,
+        "icon": "debug-start",
+        "color": "terminal.ansiRed",
+        "commands": [
+          "cd frontend && npm run dev:desktop"
+        ]
+      },
+      {
+        "name": "格式化 web-app",
+        "autoExecuteCommands": true,
+        "icon": "code",
+        "color": "terminal.ansiYellow",
+        "commands": [
+          "cd frontend/packages/web-app && npm run lint-fix"
+        ]
+      },
+      {
+        "name": "格式化 单个文件夹",
+        "autoExecuteCommands": true,
+        "icon": "code",
+        "color": "terminal.ansiYellow",
+        "commands": [
+          "cd frontend/packages/web-app/src/components/DataBatch && npx eslint ./ --fix"
+        ]
+      },
+      {
+        "name": "格式化 browser-plugin",
+        "autoExecuteCommands": true,
+        "icon": "code",
+        "color": "terminal.ansiBrightGreen",
+        "commands": [
+          "cd frontend/packages/browser-plugin && npm run lint:fix"
+        ]
+      },
+      {
+        "name": "打包 browser-plugin",
+        "autoExecuteCommands": true,
+        "icon": "plug",
+        "color": "terminal.ansiBrightGreen",
+        "commands": [
+          "cd frontend/packages/browser-plugin && npm run build:all"
+        ]
+      },
+      {
+        "name": "启动CC",
+        "autoExecuteCommands": true,
+        "icon": "plug",
+        "color": "terminal.ansiBrightGreen",
+        "commands": [
+          "shifteng run claude"
+        ]
+      }
+    ]
+  }
+}

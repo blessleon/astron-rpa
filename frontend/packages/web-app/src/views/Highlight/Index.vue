@@ -1,46 +1,46 @@
 <!-- @format -->
 
 <script lang="ts" setup>
-import ConfigProvider from '@/components/ConfigProvider/index.vue'
+// import ConfigProvider from '@/components/ConfigProvider/index.vue'
 import { useHighlight } from './hooks/useHighlight'
 import CV from './CV.vue'
+import { PickMode } from './config';
 
 const {
   dpr,
-  highlightRect,
+  highlightRects,
   mousePos,
   appName,
-  tagName,
+  pickMode,
   tooltipVisible,
   tooltipPos,
   tagPosition,
   shortcuts,
-  highlightShow,
   cvCropShow,
   setPickStep
 } = useHighlight()
 
 window['setPickStep'] = setPickStep
-
 </script>
 
 <template>
-  <ConfigProvider>
     <div class="highlight-overlay">
-      <div
-        v-if="highlightShow"
-        class="highlight-box"
-        :style="{
-        left: (highlightRect.x / dpr) + 'px',
-        top: (highlightRect.y / dpr) + 'px',
-        width: highlightRect.width + 'px',
-        height: highlightRect.height + 'px'
-      }">
-        <span :class="`highlight-tag ${tagPosition === 'top' ? 'highlight-tag-top' : 'highlight-tag-bottom'}`">
-          {{ tagName }}
-        </span>
+      <div :class="`highlight-area  ${pickMode === PickMode.VALIDATE ? 'highlight-area-validate' : ''}`">
+        <div
+          v-for="item in highlightRects"
+          :class="`highlight-box ${pickMode === PickMode.VALIDATE ? 'highlight-box-validate' : ''}`"
+          :style="{
+            transform: `translate(${item.x / dpr}px, ${item.y / dpr}px)`,
+            width: item.width + 'px',
+            height: item.height + 'px',
+          }">
+          <span v-show="item.tag" :class="`highlight-tag ${tagPosition === 'top' ? 'highlight-tag-top' : 'highlight-tag-bottom'}`">
+            {{ item.tag }}
+          </span>
+        </div>
       </div>
-      <CV v-if="cvCropShow"/>
+
+      <CV v-if="cvCropShow" />
       <div v-if="tooltipVisible" :class="`tooltip bg-bg-elevated ${tooltipPos === 'leftTop' ? 'tooltip-left-top' : 'tooltip-right-bottom'}`">
         <!-- <div class="tooltip-item font-bold">{{ modeTitle }}</div> -->
         <div class="tooltip-item font-bold" v-for="(sc, i) in shortcuts" :key="i">
@@ -57,7 +57,6 @@ window['setPickStep'] = setPickStep
         </div>
       </div>
     </div>
-  </ConfigProvider>
 </template>
 
 <style lang="scss">
@@ -67,7 +66,7 @@ window['setPickStep'] = setPickStep
   position: fixed;
   top: 0;
   left: 0;
-  // pointer-events: none;
+  pointer-events: none;
   background: transparent;
 }
 
@@ -76,9 +75,10 @@ window['setPickStep'] = setPickStep
   border: 2px solid var(--color-primary);
   background: #716fff28;
   pointer-events: none;
-  transition: all 0.1s ease-out;
-   border-radius: 4px;
-  .highlight-tag{
+  transition: all 0.2s ease-out;
+  border-radius: 4px;
+
+  .highlight-tag {
     position: absolute;
     background: #1c1c1c;
     color: #fff;
@@ -86,15 +86,40 @@ window['setPickStep'] = setPickStep
     font-size: 12px;
     border-radius: 4px;
     white-space: nowrap;
-    transition: all 0.3s ease-out;
+    transition: all 0.2s ease-out;
+
     &-top {
       top: -26px;
       left: -2px;
     }
+
     &-bottom {
       bottom: -26px;
       left: -2px;
     }
+  }
+}
+
+.highlight-box-validate {
+  transition: none;
+}
+
+.highlight-area-validate {
+  opacity: 0;
+  animation: validatePulse 0.5s infinite;
+}
+
+@keyframes validatePulse {
+  0% {
+    opacity: 0;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
   }
 }
 
@@ -107,10 +132,12 @@ window['setPickStep'] = setPickStep
   line-height: 1.5;
   pointer-events: none;
   border: 1px var(--color-border) solid;
+
   &-left-top {
     top: 10px;
     left: 10px;
   }
+
   &-right-bottom {
     bottom: 60px;
     right: 10px;
@@ -120,22 +147,25 @@ window['setPickStep'] = setPickStep
     margin-bottom: 4px;
     display: flex;
     align-items: center;
-     &:last-child {
+
+    &:last-child {
       margin-bottom: 0;
-     }
-     .short-title {
+    }
+
+    .short-title {
       margin-right: 6px;
       width: 58px;
       display: inline-block;
-     }
+    }
+
     .short-keys {
-        background: var(--color-border-secondary);
-        padding: 4px;
-        border-radius: 3px;
-        font-size: 12px;
-        border: 1px solid var(--color-border);
-        line-height: 1;
-      }
+      background: var(--color-border-secondary);
+      padding: 4px;
+      border-radius: 3px;
+      font-size: 12px;
+      border: 1px solid var(--color-border);
+      line-height: 1;
+    }
   }
 }
 </style>

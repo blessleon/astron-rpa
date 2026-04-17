@@ -1,0 +1,16 @@
+{
+  "python.analysis.regenerateStdLibIndices": true,
+  "python.defaultInterpreterPath": "C:/Users/gqzheng2/AppData/Local/gqwork/github/astron-rpa/build/python_core/python.exe",
+  "git.alwaysSignOff": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "always"
+  },
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact",
+    "vue"
+  ],
+  "eslint.run": "onSave"
+}

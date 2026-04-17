@@ -93,7 +93,10 @@ export default defineConfig((env) => {
           recordmenu: '/src/views/RecordMenu/index.ts',
           smartcompickmenu: '/src/views/SmartCompPickMenu/index.ts',
           cua: '/src/views/CUA/index.ts',
-          highlight: '/src/views/Highlight/index.ts',
+          highlight: {
+            entry: '/src/views/Highlight/index.ts',
+            template: 'src/pure.html',
+          },
         },
       }),
       enableSentry ? sentryVitePlugin(sentryConfig) : null,

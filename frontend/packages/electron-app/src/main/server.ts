@@ -91,9 +91,9 @@ export async function startServer() {
   await ensureAppWorkPathExists()
 
   let rpaSetup: ReturnType<typeof exec>
-  if (false) {
+  if (process.env.PORT) {
     const port = process.env.PORT || 13159 // 从环境变量获取端口号，默认为 13159
-    logger.info(`跳过engine启动，直接进入开发模式，连接端口号: ${port}`)
+    logger.info(`process.env.PORT : ${port}`)
     setTimeout(() => {
       sendReady(Number(port))
     }, 3000);
@@ -327,6 +327,12 @@ export async function startBackend() {
   const isRunning = await checkPythonRpaProcess()
   if (isRunning) {
     logger.info('rpa is already running')
+    return
+  }
+
+  if (process.env.PORT) {
+    logger.info('跳过Python包解压，直接进入开发模式')
+    startServer()
     return
   }
 

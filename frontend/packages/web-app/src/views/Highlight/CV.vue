@@ -3,7 +3,6 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue'
 import { windowManager, utilsManager } from '@/platform'
-import ConfigProvider from '@/components/ConfigProvider/index.vue'
 
 // ─── Emits ───────────────────────────────────────────────────────────────────
 const emit = defineEmits<{
@@ -206,7 +205,6 @@ onMounted(async () => {
 </script>
 
 <template>
-  <ConfigProvider>
     <div
       class="cv-container"
       @mousedown="onMouseDown"
@@ -264,7 +262,6 @@ onMounted(async () => {
         拖动鼠标框选目标区域
       </div>
     </div>
-  </ConfigProvider>
 </template>
 
 <style lang="scss" scoped>

@@ -57,7 +57,7 @@ export function useCreateWindow() {
   }
 
   const openHighlightWindow = async (customOptions?: { id: string }) => {
-    const pickMode = 'cv'
+    const pickMode = 'normal'
     const url = `${baseUrl}/highlight.html?pickMode=${pickMode}`
     const options: CreateWindowOptions = {
       show: false,
@@ -73,13 +73,13 @@ export function useCreateWindow() {
       fileDropEnabled: false,
       maximizable: false,
       transparent: true,
-      skipTaskbar:false,
+      skipTaskbar: true,
       fullscreen: true,
       hasShadow: false,            // 无阴影
       movable: false,              // 不可移动
       minimizable: false,          // 不可最小化
       fullscreenable: true,
-      mouseIgnore: false,
+      mouseIgnore: true,
     }
     await windowManager.createWindow(options, () => {
       
