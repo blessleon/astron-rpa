@@ -55,6 +55,7 @@ class ServiceContext:
         self.pick_server = None  # 拾取服务
         self.event_core = None
         self.ws_server = None
+        self.vision_server = None  # 视觉拾取服务
 
         # 全局状态
         self.sapguiauto = None

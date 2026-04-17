@@ -111,6 +111,7 @@ class PickerType(Enum):
     BATCH = "BATCH"  # 抓取
     RECORD = "RECORD"  # 录制器
     SMART_COMPONENT = "SMART_COMPONENT"  # 智能录制
+    VISION = "VISION"  # 视觉拾取
 
 
 PICKER_TYPE_DICT = {p.value: True for p in PickerType}
@@ -146,6 +147,23 @@ class SmartComponentAction(Enum):
     NEXT = "SMART_COMPONENT_NEXT"  # 获取拾取元素的子类元素
     CANCEL = "SMART_COMPONENT_CANCEL"  # 取消拾取
     END = "SMART_COMPONENT_END"  # 拾取完成结束
+
+
+class VisionAction(Enum):
+    """视觉拾取动作 - 专门处理视觉拾取相关的子操作"""
+
+    START = "VISION_START"  # 开始视觉拾取
+    VALIDATE = "VISION_VALIDATE"  # 验证视觉元素
+    DESIGNATE = "VISION_DESIGNATE"  # 指定视觉元素（重拾锚点）
+
+
+class VisionHlFeedback(Enum):
+    """hl 回传给 VisionServer 的 feedback 类型"""
+
+    CONFIRM = "confirm"  # 用户确认选取
+    STOP = "stop"  # 用户停止（等同取消）
+    CONTINUE = "continue"  # 用户继续重选
+    SCREENSHOT = "screenshot"  # hl 回传截图数据
 
 
 class PickerDomain(Enum):

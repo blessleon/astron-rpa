@@ -1,11 +1,12 @@
 import time
 
-from astronverse.picker import PickerSign, RecordAction, SmartComponentAction
+from astronverse.picker import PickerSign, RecordAction, SmartComponentAction, VisionAction
 
 
 _NORMAL_PICK_ACTIONS = {a.value for a in PickerSign}
 _SMART_COMPONENT_ACTIONS = {a.value for a in SmartComponentAction}
 _RECORD_ACTIONS = {a.value for a in RecordAction}
+_VISION_ACTIONS = {a.value for a in VisionAction}
 
 
 class PickerServer:
@@ -16,6 +17,7 @@ class PickerServer:
         self._normal_pick = None
         self._smart_pick = None
         self._record = None
+        self._vision = None
 
     def _get_normal_pick(self):
         if self._normal_pick is None:
@@ -34,6 +36,13 @@ class PickerServer:
             from astronverse.picker.server.servers.record_server import RecordServer
             self._record = RecordServer(self.service_context)
         return self._record
+
+    def _get_vision(self):
+        if self._vision is None:
+            from astronverse.picker.server.servers.vision_server import VisionServer
+            self._vision = VisionServer(self.service_context)
+            self.service_context.vision_server = self._vision
+        return self._vision
 
     def server(self):
         """公共分发循环：等待模块就绪后，按 action 路由到对应子服务"""
@@ -59,5 +68,7 @@ class PickerServer:
                 self._get_smart_pick().handle(sign)
             elif any(a in sign for a in _RECORD_ACTIONS):
                 self._get_record().handle(sign)
+            elif any(a in sign for a in _VISION_ACTIONS):
+                self._get_vision().handle(sign)
             else:
                 time.sleep(0.1)

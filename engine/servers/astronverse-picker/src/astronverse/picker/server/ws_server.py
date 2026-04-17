@@ -22,11 +22,13 @@ class WsServer:
             "record": [],
             "hl": [],
             "smart_component": [],
+            "vision": [],
         }
         self._picker_handler = None
         self._hl_handler = None
         self._record_handler = None
         self._smart_component_handler = None
+        self._vision_handler = None
 
     def _add(self, ws: ServerConnection) -> None:
         """新连接放入未识别池"""
@@ -71,6 +73,12 @@ class WsServer:
             self._smart_component_handler = SmartComponentHandler(self.svc)
         return self._smart_component_handler
 
+    def _import_vision_handler(self):
+        if self._vision_handler is None:
+            from astronverse.picker.server.handlers.vision_handler import VisionHandler
+            self._vision_handler = VisionHandler(self.svc)
+        return self._vision_handler
+
     @property
     def hl(self):
         return self._import_hl_handler()
@@ -95,6 +103,11 @@ class WsServer:
                     if data.get("message_type") == "ack":
                         # 推送消息
                         continue
+                    # hl 通道：处理 feedback 回传
+                    if ws in self.connections.get("hl", []):
+                        if data.get("feedback_type") and self.svc.vision_server:
+                            self.svc.vision_server.on_hl_feedback(data)
+                        continue  # hl 消息不走 pick_type 路由
                     if data.get("pick_type", None):
                         # 拾取消息
                         pick_type = data.get("pick_type", None)
@@ -104,6 +117,9 @@ class WsServer:
                         elif pick_type == PickerType.SMART_COMPONENT.value:
                             self._move(ws, "smart_component")
                             await self._import_smart_component_handler().dispatch(ws_server=self, data=data)
+                        elif pick_type == PickerType.VISION.value:
+                            self._move(ws, "vision")
+                            await self._import_vision_handler().dispatch(ws_server=self, ws=ws, data=data)
                         else:
                             self._move(ws, "picker")
                             await self._import_picker_handler().dispatch(ws_server=self, data=data)

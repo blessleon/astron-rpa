@@ -74,6 +74,41 @@ class HlHandler:
             })
         await self._broadcast(msg)
 
+    async def mouse_move(self, x: int, y: int) -> None:
+        """发送鼠标位置更新（不含 Boxes，仅用于实时追踪）"""
+        await self._broadcast({"Operation": "mouse_move", "MouseX": x, "MouseY": y})
+
+    async def cv_start(self, mode: str) -> None:
+        """通知 hl 进入视觉拾取模式
+        mode: "vision_wait" | "ctrl" | "alt" | "designate" | "hide"
+        """
+        await self._broadcast({"Operation": "start", "Type": mode, "Language": i18n.language})
+
+    async def cv_initialize(self, status: str) -> None:
+        """通知 hl 初始化状态（ESC 或 SHIFT）
+        status: "ESC" | "SHIFT"
+        """
+        await self._broadcast({"Operation": "initialize", "Type": status})
+
+    async def cv_active_window(self, rect: tuple) -> None:
+        """通知 hl 当前活动窗口区域（用于 CTRL 模式）
+        rect: (left, top, width, height)
+        """
+        await self._broadcast({
+            "Operation": "active_window",
+            "Boxes": [{
+                "Left": rect[0],
+                "Top": rect[1],
+                "Right": rect[0] + rect[2],
+                "Bottom": rect[1] + rect[3],
+                "Msg": ""
+            }]
+        })
+
+    async def request_screenshot(self) -> None:
+        """请求 hl 进行截图（hl 会回传 feedback_type=screenshot）"""
+        await self._broadcast({"Operation": "request_screenshot"})
+
     def start_sync(self, draw_type: str = "normal") -> None:
         _run_sync(self.start(draw_type))
 
@@ -88,4 +123,18 @@ class HlHandler:
     ) -> None:
         _run_sync(self.draw(rects, msgs, draw_type))
 
+    def mouse_move_sync(self, x: int, y: int) -> None:
+        _run_sync(self.mouse_move(x, y))
+
+    def cv_start_sync(self, mode: str) -> None:
+        _run_sync(self.cv_start(mode))
+
+    def cv_initialize_sync(self, status: str) -> None:
+        _run_sync(self.cv_initialize(status))
+
+    def cv_active_window_sync(self, rect: tuple) -> None:
+        _run_sync(self.cv_active_window(rect))
+
+    def request_screenshot_sync(self) -> None:
+        _run_sync(self.request_screenshot())
 

@@ -4,7 +4,7 @@ from typing import Optional, Any
 
 from pydantic import BaseModel
 
-from astronverse.picker import PickerType, RecordAction, SmartComponentAction, PickerSign
+from astronverse.picker import PickerType, RecordAction, SmartComponentAction, PickerSign, VisionAction
 
 
 class ResponseKey(Enum):
@@ -26,6 +26,7 @@ class RequestMessage(BaseModel):
     pick_sign: Optional[PickerSign] = None
     record_action: Optional[RecordAction] = None
     smart_component_action: Optional[SmartComponentAction] = None
+    vision_action: Optional[VisionAction] = None
     data: Any = None
     pick_mode: str = None
     ext_data: dict = None
