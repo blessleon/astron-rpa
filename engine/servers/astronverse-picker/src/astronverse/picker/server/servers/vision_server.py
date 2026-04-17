@@ -147,7 +147,7 @@ class VisionServer:
 
             while True:
                 if time.time() - start_time > timeout:
-                    hl.cv_initialize_sync("ESC")
+                    hl.hide_sync()
                     return "cancel"
 
                 with key_lock:
@@ -155,7 +155,7 @@ class VisionServer:
                     key_event["mode"] = None
 
                 if mode == "esc":
-                    hl.cv_initialize_sync("ESC")
+                    hl.hide_sync()
                     return "cancel"
 
                 if mode == "shift":
@@ -165,7 +165,7 @@ class VisionServer:
 
                 if mode in ("alt", "ctrl"):
                     # 请求截图（hl 会自动维护截图状态，无需手动 hide）
-                    hl.request_screenshot_sync()
+                    # hl.request_screenshot_sync()
 
                     # 等待 hl 回传截图
                     screenshot_data = self._wait_feedback(
@@ -173,7 +173,6 @@ class VisionServer:
                     )
                     if screenshot_data is None:
                         logger.warning("VisionServer: 截图超时，重新等待")
-                        hl.cv_start_sync("vision_wait")
                         continue
 
                     # 解码截图
@@ -200,7 +199,7 @@ class VisionServer:
                     )
 
                     if result == "cancel":
-                        hl.cv_initialize_sync("ESC")
+                        hl.hide_sync()
                         return "cancel"
                     if result == "shift":
                         hl.cv_initialize_sync("SHIFT")
@@ -210,7 +209,7 @@ class VisionServer:
                         # 有目标 rect，进行 check_target
                         pick_result = self._check_target(result, desktop_image, bboxes, partial_rect)
                         if pick_result:
-                            hl.cv_initialize_sync("ESC")
+                            hl.hide_sync()
                             return pick_result
                         else:
                             # 目标获取失败，重新等待
@@ -253,8 +252,6 @@ class VisionServer:
                         b = boxes[0]
                         return (b["Left"], b["Top"], b["Right"], b["Bottom"])
                     return draw_rect
-                elif fb_type == VisionHlFeedback.STOP.value:
-                    return "cancel"
                 elif fb_type == VisionHlFeedback.CONTINUE.value:
                     return "shift"
             except queue.Empty:
@@ -360,13 +357,13 @@ class VisionServer:
         # 鼠标追踪，等待用户选取锚点
         result = self._mouse_track_loop(hl, desktop_image, bboxes, *desktop_image.size)
         if result in ("cancel", "shift", None):
-            hl.cv_initialize_sync("ESC")
+            hl.hide_sync()
             return "cancel"
 
         # check_anchor
         anchor_rect = result  # (left, top, right, bottom)
         pick_result = self._check_anchor(anchor_rect, desktop_image)
-        hl.cv_initialize_sync("ESC")
+        hl.hide_sync()
         return pick_result
 
     # ------------------------------------------------------------------
