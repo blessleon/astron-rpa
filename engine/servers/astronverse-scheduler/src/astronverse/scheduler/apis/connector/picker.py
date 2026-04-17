@@ -18,7 +18,6 @@ def picker_start(svc: Svc = Depends(get_svc)):
 
     svc.picker.highlighter.run()
     svc.picker.app_picker.run()
-    svc.picker.vision_picker.run()
     svc.picker.set_start(True)
 
     tag = True
@@ -42,9 +41,8 @@ def picker_stop(svc: Svc = Depends(get_svc)):
     """
     try:
         svc.picker.set_start(False)
-        svc.picker.vision_picker.kill()
         svc.picker.app_picker.kill()
         svc.picker.highlighter.kill()
-    except Exception as e:
+    except Exception:
         pass
     return res_msg(msg="停止成功", data=None)

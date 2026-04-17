@@ -82,10 +82,6 @@ class CheckPickProcessAliveServer(IServer):
         while True:
             try:
                 if self.svc.picker.start:
-                    if self.svc.picker.vision_picker:
-                        if not self.svc.picker.vision_picker.is_alive():
-                            logger.debug("[CheckPickProcessAlive] 重启 vision_picker")
-                            self.svc.picker.vision_picker.run()
                     if self.svc.picker.app_picker:
                         if not self.svc.picker.app_picker.is_alive():
                             logger.debug("[CheckPickProcessAlive] 重启 app_picker")
