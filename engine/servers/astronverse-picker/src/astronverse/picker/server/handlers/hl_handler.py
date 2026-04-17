@@ -106,7 +106,7 @@ class HlHandler:
         })
 
     async def request_screenshot(self) -> None:
-        """请求 hl 进行截图（hl 会回传 feedback_type=screenshot）"""
+        """请求 hl 截图并回传（hl 自行维护截图状态，picker 无需先 hide）"""
         await self._broadcast({"Operation": "request_screenshot"})
 
     def start_sync(self, draw_type: str = "normal") -> None:

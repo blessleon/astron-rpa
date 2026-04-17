@@ -164,8 +164,7 @@ class VisionServer:
                     continue
 
                 if mode in ("alt", "ctrl"):
-                    # 隐藏 hl 蒙层，请求截图
-                    hl.cv_start_sync("hide")
+                    # 请求截图（hl 会自动维护截图状态，无需手动 hide）
                     hl.request_screenshot_sync()
 
                     # 等待 hl 回传截图
@@ -334,8 +333,7 @@ class VisionServer:
             hl.draw_sync(r, "", "designate_target")
         hl.cv_start_sync("designate")
 
-        # Step 3: 请求截图
-        hl.cv_start_sync("hide")
+        # Step 3: 请求截图（hl 自动维护截图状态，无需 hide）
         hl.request_screenshot_sync()
         screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
         if screenshot_data is None:
