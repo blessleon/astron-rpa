@@ -79,31 +79,23 @@ class HlHandler:
         await self._broadcast({"Operation": "mouse_move", "MouseX": x, "MouseY": y})
 
     async def cv_start(self, mode: str) -> None:
-        """通知 hl 进入视觉拾取模式
-        mode: "vision_wait" | "ctrl" | "alt" | "designate" | "hide"
+        """通知 hl 进入特定的视觉拾取模式
+        mode:  ""designate"
         """
-        await self._broadcast({"Operation": "start", "Type": mode, "Language": i18n.language})
+        await self._broadcast({"Operation": "start", "Type": "vision", "mode": mode, "Language": i18n.language})
+
+    async def cv_shortcutkey(self, mode: str) -> None:
+        """通知 hl 进入视觉拾取模式
+        mode:  ""designate"
+        """
+        await self._broadcast({"Operation": "start", "ShortcutKey": mode, "Language": i18n.language})
 
     async def cv_initialize(self, status: str) -> None:
         """通知 hl 初始化状态（ESC 或 SHIFT）
         status: "ESC" | "SHIFT"
         """
-        await self._broadcast({"Operation": "initialize", "Type": status})
+        await self._broadcast({"Operation": "initialize", "ShortcutKey": status})
 
-    async def cv_active_window(self, rect: tuple) -> None:
-        """通知 hl 当前活动窗口区域（用于 CTRL 模式）
-        rect: (left, top, width, height)
-        """
-        await self._broadcast({
-            "Operation": "active_window",
-            "Boxes": [{
-                "Left": rect[0],
-                "Top": rect[1],
-                "Right": rect[0] + rect[2],
-                "Bottom": rect[1] + rect[3],
-                "Msg": ""
-            }]
-        })
 
     async def request_screenshot(self) -> None:
         """请求 hl 截图并回传（hl 自行维护截图状态，picker 无需先 hide）"""
@@ -128,6 +120,9 @@ class HlHandler:
 
     def cv_start_sync(self, mode: str) -> None:
         _run_sync(self.cv_start(mode))
+
+    def cv_shortcutkey_sync(self, mode: str) -> None:
+        _run_sync(self.cv_shortcutkey(mode))
 
     def cv_initialize_sync(self, status: str) -> None:
         _run_sync(self.cv_initialize(status))

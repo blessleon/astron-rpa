@@ -99,15 +99,15 @@ class VisionServer:
         START 状态机：
         1. 通知 hl 进入 vision_wait 模式
         2. 监听键盘（Alt / Ctrl / ESC / Shift）
-        3. Alt → 请求 hl 截图 → 接收截图 → 分割 → 鼠标追踪 → 等待确认
-        4. Ctrl → 请求 hl 截图 → 接收截图 → 鼠标追踪（无分割）→ 等待确认
+        3. Alt → 接收截图 → 分割 → 鼠标追踪 → 等待确认
+        4. Ctrl → 接收截图 → 鼠标追踪（无分割）→ 等待确认
         5. 确认 → check_target → 返回结果
         6. ESC / 超时 → 返回 "cancel"
         """
         hl = self.svc.ws_server.hl
 
         # 通知 hl 进入等待模式
-        hl.cv_start_sync("vision_wait")
+        hl.start_sync("vision")
 
         # 键盘状态
         current_keys: set = set()
@@ -178,18 +178,18 @@ class VisionServer:
                     # 解码截图
                     desktop_image = self._decode_screenshot(screenshot_data)
                     if desktop_image is None:
-                        hl.cv_start_sync("vision_wait")
+                        logger.warning("截图解码失败")
                         continue
 
                     screen_w, screen_h = desktop_image.size
 
                     if mode == "alt":
                         # ALT 模式：分割界面元素
-                        hl.cv_start_sync("alt")
+                        hl.cv_shortcutkey_sync("alt")
                         bboxes, partial_rect = self._detect_alt(desktop_image)
                     else:
                         # CTRL 模式：全屏，无分割
-                        hl.cv_start_sync("ctrl")
+                        hl.cv_shortcutkey_sync("ctrl")
                         bboxes = None
                         partial_rect = (0, 0, screen_w, screen_h)
 
@@ -203,7 +203,6 @@ class VisionServer:
                         return "cancel"
                     if result == "shift":
                         hl.cv_initialize_sync("SHIFT")
-                        # hl.cv_start_sync("vision_wait")
                         continue
                     if result is not None:
                         # 有目标 rect，进行 check_target
@@ -340,8 +339,7 @@ class VisionServer:
             hl.draw_sync(r, "", "designate_target")
         hl.cv_start_sync("designate")
 
-        # Step 3: 请求截图（hl 自动维护截图状态，无需 hide）
-        hl.request_screenshot_sync()
+        # Step 3: 等待截图（hl 自动维护截图状态，无需 hide）
         screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
         if screenshot_data is None:
             return None
@@ -352,7 +350,7 @@ class VisionServer:
 
         # 分割界面元素（ALT 模式）
         bboxes, partial_rect = self._detect_alt(desktop_image)
-        hl.cv_start_sync("alt")
+        hl.cv_shortcutkey_sync("alt")
 
         # 鼠标追踪，等待用户选取锚点
         result = self._mouse_track_loop(hl, desktop_image, bboxes, *desktop_image.size)
