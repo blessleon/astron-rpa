@@ -132,9 +132,6 @@ class HlHandler:
     def cv_initialize_sync(self, status: str) -> None:
         _run_sync(self.cv_initialize(status))
 
-    def cv_active_window_sync(self, rect: tuple) -> None:
-        _run_sync(self.cv_active_window(rect))
-
     def request_screenshot_sync(self) -> None:
         _run_sync(self.request_screenshot())
 

@@ -188,7 +188,6 @@ class VisionServer:
                         # ALT 模式：分割界面元素
                         hl.cv_start_sync("alt")
                         bboxes, partial_rect = self._detect_alt(desktop_image)
-                        hl.cv_active_window_sync(partial_rect)
                     else:
                         # CTRL 模式：全屏，无分割
                         hl.cv_start_sync("ctrl")
@@ -356,7 +355,6 @@ class VisionServer:
 
         # 分割界面元素（ALT 模式）
         bboxes, partial_rect = self._detect_alt(desktop_image)
-        hl.cv_active_window_sync(partial_rect)
         hl.cv_start_sync("alt")
 
         # 鼠标追踪，等待用户选取锚点
