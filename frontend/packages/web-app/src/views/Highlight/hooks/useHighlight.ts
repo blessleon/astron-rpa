@@ -93,7 +93,7 @@ export function useHighlight() {
       case 'hide':
         highlightRects.value = []
         hideAll()
-        windowManager.hideWindow()
+        // windowManager.hideWindow()
         break
       case 'draw':
         handleDraw(data)
