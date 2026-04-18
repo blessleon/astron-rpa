@@ -381,7 +381,7 @@ class VisionServer:
                         if fb_type == VisionHlFeedback.CONFIRM.value:
                             # hl 已确认，直接从 data 中提取 anchor rect
                             # data 结构待定，预期携带 Left/Top/Right/Bottom
-                            data = feedback.get("data") or {}
+                            data = feedback.get("data",{}).get("Boxes",{})
                             try:
                                 return (
                                     data["Left"],
