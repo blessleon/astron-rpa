@@ -79,35 +79,62 @@ class HlHandler:
         await self._broadcast({"Operation": "mouse_move", "MouseX": x, "MouseY": y})
 
     async def cv_start(self, mode: str) -> None:
-        """通知 hl 进入视觉拾取模式
-        mode: "vision_wait" | "ctrl" | "alt" | "designate" | "hide"
+        """通知 hl 进入特定的视觉拾取模式
+        mode:  ""designate"
         """
-        await self._broadcast({"Operation": "start", "Type": mode, "Language": i18n.language})
+        await self._broadcast({"Operation": "start", "Type": "vision", "mode": mode, "Language": i18n.language})
+
+    async def cv_shortcutkey(self, mode: str) -> None:
+        """通知 hl 进入视觉拾取模式
+        mode:  ""designate"
+        """
+        await self._broadcast({"Operation": "start", "ShortcutKey": mode, "Language": i18n.language})
 
     async def cv_initialize(self, status: str) -> None:
         """通知 hl 初始化状态（ESC 或 SHIFT）
         status: "ESC" | "SHIFT"
         """
-        await self._broadcast({"Operation": "initialize", "Type": status})
+        await self._broadcast({"Operation": "initialize", "ShortcutKey": status})
 
-    async def cv_active_window(self, rect: tuple) -> None:
-        """通知 hl 当前活动窗口区域（用于 CTRL 模式）
-        rect: (left, top, width, height)
-        """
-        await self._broadcast({
-            "Operation": "active_window",
-            "Boxes": [{
-                "Left": rect[0],
-                "Top": rect[1],
-                "Right": rect[0] + rect[2],
-                "Bottom": rect[1] + rect[3],
-                "Msg": ""
-            }]
-        })
 
     async def request_screenshot(self) -> None:
         """请求 hl 截图并回传（hl 自行维护截图状态，picker 无需先 hide）"""
         await self._broadcast({"Operation": "request_screenshot"})
+
+    async def designate_pick(
+        self,
+        target_rect: Rect | None = None,
+        anchor_rect: Rect | None = None,
+        event: str = "target_ready",
+    ) -> None:
+        """统一的 designate 拾取消息
+
+        Args:
+            target_rect: 目标图片的矩形区域（初始化时有值）
+            anchor_rect: 候选锚点的矩形区域（鼠标移动/点击时有值）
+            event: 事件类型 - "target_ready" | "mouse_move" | "click_confirm"
+        """
+        cur_x, cur_y = UIAOperate.get_cursor_pos()
+        msg = {
+            "Operation": "draw",
+            "Type": "designate_pick",
+            "TargetRect": self._rect_to_dict(target_rect) if target_rect else None,
+            "AnchorRect": self._rect_to_dict(anchor_rect) if anchor_rect else None,
+            "MouseX": cur_x,
+            "MouseY": cur_y,
+            "Event": event,
+        }
+        await self._broadcast(msg)
+
+    @staticmethod
+    def _rect_to_dict(rect: Rect) -> dict:
+        """将 Rect 转换为字典格式"""
+        return {
+            "Left": rect.left,
+            "Top": rect.top,
+            "Right": rect.right,
+            "Bottom": rect.bottom,
+        }
 
     def start_sync(self, draw_type: str = "normal") -> None:
         _run_sync(self.start(draw_type))
@@ -129,9 +156,20 @@ class HlHandler:
     def cv_start_sync(self, mode: str) -> None:
         _run_sync(self.cv_start(mode))
 
+    def cv_shortcutkey_sync(self, mode: str) -> None:
+        _run_sync(self.cv_shortcutkey(mode))
+
     def cv_initialize_sync(self, status: str) -> None:
         _run_sync(self.cv_initialize(status))
 
     def request_screenshot_sync(self) -> None:
         _run_sync(self.request_screenshot())
+
+    def designate_pick_sync(
+        self,
+        target_rect: Rect | None = None,
+        anchor_rect: Rect | None = None,
+        event: str = "target_ready",
+    ) -> None:
+        _run_sync(self.designate_pick(target_rect, anchor_rect, event))
 
