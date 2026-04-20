@@ -1,7 +1,8 @@
 
 import { ref, computed } from 'vue'
 import { RpaHighlight } from '@/api/highlight'
-import { DrawRect } from '../config'
+import { DrawRect, HighlightRect } from '../config'
+import { message } from 'ant-design-vue'
 
 type CvPickEvent = 'target_ready' | 'mouse_move' | 'click_confirm' | ''
 
@@ -80,12 +81,17 @@ export function useCV() {
 
   // 发送截图
   const sendScreenshot = (imageBase64: string) => {
+    console.log('sendScreenshot: ', imageBase64);
     sendFeedback('screenshot', { image: imageBase64 })
   }
 
   const confirmCvAltPick = () => {
     sendFeedback('confirm')
     reset()
+  }
+  const confirmCvCtrlPick = (params: { imageDataUrl: string, position: HighlightRect}) => {
+    const data = params.position
+    sendFeedback('confirm', { Boxes: [{ "Left": data.x, "Top": data.y, "Right": data.x + data.width, "Bottom": data.y + data.height }] })
   }
 
   const reCvAltPick = () => {
@@ -112,5 +118,6 @@ export function useCV() {
     reset,
     confirmCvAltPick,
     reCvAltPick,
+    confirmCvCtrlPick,
   }
 }

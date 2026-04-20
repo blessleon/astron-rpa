@@ -55,11 +55,19 @@ export const useCvPickStore = defineStore('cvPickStore', () => {
       const { key, data, err_msg } = res || {} // key: 'success' | 'error' | 'ping'
       console.log('bindMessage: ', res)
       if (key === 'success' && data) {
-        const dataObj = JSON.parse(data)
-        callback && callback({
-          success: true,
-          data: dataObj,
-        })
+        try{
+           const dataObj = JSON.parse(data)
+           callback && callback({
+            success: true,
+            data: dataObj,
+          })
+        } catch(e) {
+          message.error('Invalid data received from CV Picker')
+          callback && callback({
+            success: false,
+            data: null,
+          })
+        }
         finishPick()
       }
       if (key === 'cancel') {

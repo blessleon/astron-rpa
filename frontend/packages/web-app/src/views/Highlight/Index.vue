@@ -3,25 +3,25 @@
 <script lang="ts" setup>
 // import ConfigProvider from '@/components/ConfigProvider/index.vue'
 import { useHighlight } from './hooks/useHighlight'
+import { useCV } from './hooks/useCV'
 import CV from './CV.vue'
-import { PickMode } from './config';
+import { PickMode } from './config'
+
+const { targetRect, confirmCvCtrlPick, confirmCvAltPick, sendScreenshot, reCvAltPick, handleMessage: handleCvMessage } = useCV()
 
 const {
   highlightBox,
-  dpr,
-  highlightRects,
   mousePos,
   appName,
   pickMode,
   tooltipVisible,
   tooltipPos,
-  tagPosition,
   shortcuts,
   cvCropShow,
+  pickStep,
   setPickStep
-} = useHighlight()
+} = useHighlight(handleCvMessage)
 
-window['setPickStep'] = setPickStep
 </script>
 
 <template>
@@ -29,7 +29,15 @@ window['setPickStep'] = setPickStep
       <div ref="highlightBox" :class="`highlight-area  ${pickMode === PickMode.VALIDATE ? 'highlight-area-validate' : ''}`">
       </div>
 
-      <CV v-if="cvCropShow" />
+      <CV
+        v-if="cvCropShow"
+        :cvStep="pickStep"
+        :targetRect="targetRect"
+        @save="confirmCvCtrlPick"
+        @confirm-alt="confirmCvAltPick"
+        @send-screenshot="sendScreenshot"
+        @reselect-alt="reCvAltPick"
+      />
       <div v-if="tooltipVisible" :class="`tooltip bg-bg-elevated ${tooltipPos === 'leftTop' ? 'tooltip-left-top' : 'tooltip-right-bottom'}`">
         <!-- <div class="tooltip-item font-bold">{{ modeTitle }}</div> -->
         <div class="tooltip-item font-bold" v-for="(sc, i) in shortcuts" :key="i">
@@ -55,9 +63,9 @@ window['setPickStep'] = setPickStep
   position: fixed;
   top: 0;
   left: 0;
-  pointer-events: none;
   background: transparent;
 }
+
 
 .highlight-box {
   position: absolute;
@@ -91,6 +99,10 @@ window['setPickStep'] = setPickStep
 
 .highlight-box-validate {
   transition: none;
+}
+
+.highlight-area {
+  pointer-events: none;
 }
 
 .highlight-area-validate {

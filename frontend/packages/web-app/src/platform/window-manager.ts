@@ -101,6 +101,7 @@ class BrowserWindowManager implements WindowManager {
   }): Promise<any> {
     return Promise.resolve(true)
   }
+  async setMouseIgnore(_ignore: boolean) {}
 }
 
 export default BrowserWindowManager

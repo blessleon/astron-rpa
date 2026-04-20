@@ -188,6 +188,7 @@ class VisionServer:
                     box = confirm_result[0]
                     target_rect_ltrb = (box["Left"], box["Top"], box["Right"], box["Bottom"])
                     l, t, r, b = box["Left"], box["Top"], box["Right"], box["Bottom"]
+                    desktop_image = self._decode_screenshot(screenshot_data)
                     partial_rect = (0, 0, desktop_image.width, desktop_image.height)
                     target_img = pyautogui.screenshot(region=(l, t, r - l, b - t))
                     

@@ -3,16 +3,14 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue'
 import { windowManager, utilsManager } from '@/platform'
+import { DrawRect } from './config'
 
-// ─── Emits ───────────────────────────────────────────────────────────────────
-const emit = defineEmits<{
-  save: [
-    data: {
-      imageDataUrl: string
-      position: { x: number; y: number; width: number; height: number }
-    },
-  ]
+const props = defineProps<{
+  cvStep: string
+  targetRect?: DrawRect | null
 }>()
+// ─── Emits ───────────────────────────────────────────────────────────────────
+const emit = defineEmits(['save', 'confirmAlt', 'reselectAlt', 'sendScreenshot'])
 
 // ─── Screenshot state ────────────────────────────────────────────────────────
 const screenshotDataUrl = ref<string>('')
@@ -27,7 +25,23 @@ const hasSelection = ref(false)
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const dpr = window.devicePixelRatio || 1
 
+// cv_alt 模式：显示智能拾取的高亮位置
+const isCvAltMode = computed(() => props.cvStep === 'cv_alt')
+// cv_alt 模式下，有 targetRect 即视为有选区
+const hasAltSelection = computed(() => isCvAltMode.value && !!props.targetRect)
+
 const selection = computed(() => {
+  // cv_alt 模式：使用后端返回的 targetRect
+  if (isCvAltMode.value && props.targetRect) {
+    return {
+      x: props.targetRect.Left / dpr,
+      y: props.targetRect.Top / dpr,
+      width: (props.targetRect.Right - props.targetRect.Left) / dpr,
+      height: (props.targetRect.Bottom - props.targetRect.Top) / dpr,
+    }
+  }
+
+  // cv_ctrl 模式：使用用户手动选择的区域
   const x = Math.min(startPos.value.x, currentPos.value.x)
   const y = Math.min(startPos.value.y, currentPos.value.y)
   const width = Math.abs(currentPos.value.x - startPos.value.x)
@@ -96,6 +110,8 @@ const actionBarStyle = computed(() => {
 
 // ─── Mouse event handlers ─────────────────────────────────────────────────────
 function onMouseDown(e: MouseEvent) {
+  // cv_alt 模式下禁用手动选择
+  if (isCvAltMode.value) return
   if (e.button !== 0) return
   // 点击按钮区域时不重置选区
   if ((e.target as HTMLElement).closest('.cv-action-bar')) return
@@ -130,7 +146,6 @@ function onMouseLeave() {
 function cancelSelection() {
   hasSelection.value = false
   isSelecting.value = false
-  emit
 }
 
 function saveSelection() {
@@ -158,30 +173,17 @@ function saveSelection() {
       imageDataUrl,
       position: { x: sel.x, y: sel.y, width: sel.width, height: sel.height },
     })
-
     console.log('Selected area:', sel)
-
-    try {
-      const arrayBuffer = await (await fetch(imageDataUrl)).arrayBuffer()
-      const saved = await utilsManager.saveFile(`astron-screenshot-${Date.now()}.png`, arrayBuffer)
-      if (saved) {
-        console.log('[CV] Image saved locally')
-      }
-      else {
-        console.warn('[CV] Image save cancelled or failed')
-      }
-    }
-    catch (err) {
-      console.error('[CV] Failed to save image locally:', err)
-    }
-
-    canvas.toBlob(blob => {
-      if (blob) {
-        const item = new ClipboardItem({ 'image/png': blob })
-        navigator.clipboard.write([item])
-      }
-    })
   }
+}
+
+// cv_alt 模式的操作
+function confirmAltSelection() {
+  emit('confirmAlt')
+}
+
+function reselectAlt() {
+  emit('reselectAlt')
 }
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
@@ -192,6 +194,11 @@ onMounted(async () => {
     if (dataUrl) {
       screenshotDataUrl.value = dataUrl as string
     }
+    if (props.cvStep === 'cv_alt') {
+      // cv_alt 模式下直接显示后端分析的选区，不允许手动选择
+      hasSelection.value = false
+      emit('sendScreenshot', screenshotDataUrl.value)
+    }
   }
   catch (err) {
     console.error('[CV] Failed to capture screen:', err)
@@ -201,31 +208,18 @@ onMounted(async () => {
     isLoading.value = false
   }
 })
-
 </script>
 
 <template>
-    <div
-      class="cv-container"
-      @mousedown="onMouseDown"
-      @mousemove="onMouseMove"
-      @mouseup="onMouseUp"
-      @mouseleave="onMouseLeave"
-    >
-      <!-- 截图作为全屏背景 -->
-      <img
-        v-if="screenshotDataUrl"
-        class="cv-screenshot"
-        src="file:///C:/Users/gqzheng2/Downloads/dk.png"
-        draggable="false"
-        alt=""
-      />
+  <div class="cv-container" @mousedown="onMouseDown" @mousemove="onMouseMove" @mouseup="onMouseUp" @mouseleave="onMouseLeave">
+    <!-- 截图作为全屏背景 -->
+    <img v-if="screenshotDataUrl" class="cv-screenshot" :src="screenshotDataUrl" draggable="false" alt="" />
 
       <!-- 无选区时：整屏黑色半透明遮罩 -->
-      <div v-if="!isSelecting && !hasSelection" class="cv-overlay cv-overlay--full" />
+      <div v-if="!isSelecting && !hasSelection && !isCvAltMode" class="cv-overlay cv-overlay--full" />
 
       <!-- 有选区时：四块遮罩围绕选区，选区内透明 -->
-      <template v-else>
+      <template v-if="hasSelection || isSelecting">
         <div class="cv-overlay" :style="topOverlayStyle" />
         <div class="cv-overlay" :style="bottomOverlayStyle" />
         <div class="cv-overlay" :style="leftOverlayStyle" />
@@ -245,23 +239,21 @@ onMounted(async () => {
         <span class="cv-corner cv-corner--br" />
       </div>
 
-      <!-- 操作按钮：拖拽结束后显示 -->
-      <div v-if="hasSelection && !isSelecting" class="cv-action-bar" :style="actionBarStyle">
-        <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="cancelSelection">
-          取消
-        </button>
-        <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="saveSelection">
-          保存
-        </button>
-      </div>
-
-      <!-- 提示信息 -->
-      <!-- <div v-if="isLoading" class="cv-hint">正在截图…</div> -->
-      <!-- <div v-else-if="!screenshotDataUrl" class="cv-hint">截图失败，请重试</div> -->
-      <div v-else-if="!hasSelection && !isSelecting" class="cv-tip">
-        拖动鼠标框选目标区域
-      </div>
+    <!-- cv_alt 模式：保存 / 重新选择 -->
+    <div v-if="hasAltSelection" class="cv-action-bar" :style="actionBarStyle">
+      <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="reselectAlt">重新选择</button>
+      <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="confirmAltSelection">保存</button>
     </div>
+
+    <!-- cv_ctrl 模式：取消 / 保存 -->
+    <div v-else-if="hasSelection && !isSelecting" class="cv-action-bar" :style="actionBarStyle">
+      <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="cancelSelection">取消</button>
+      <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="saveSelection">保存</button>
+    </div>
+
+    <!-- 提示信息 -->
+    <div v-else-if="!hasSelection && !isSelecting && !isCvAltMode" class="cv-tip">拖动鼠标框选目标区域</div>
+  </div>
 </template>
 
 <style lang="scss" scoped>
@@ -295,6 +287,7 @@ onMounted(async () => {
 }
 
 .cv-overlay {
+
   position: fixed;
   background: rgba(0, 0, 0, 0.4);
   pointer-events: none;
@@ -308,6 +301,11 @@ onMounted(async () => {
   border: 1px solid rgba(255, 255, 255, 0.9);
   pointer-events: none;
   box-sizing: border-box;
+
+  &--alt {
+    border: 2px solid #1677ff;
+    box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.2);
+  }
 
   .cv-size-label {
     position: absolute;
@@ -358,7 +356,7 @@ onMounted(async () => {
   display: flex;
   gap: 8px;
   z-index: 200;
-  width: 134px;
+  width: max-content;
 }
 
 .cv-btn {

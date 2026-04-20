@@ -6,7 +6,7 @@ import { message } from 'ant-design-vue'
 
 
 
-export function useHighlight() {
+export function useHighlight(cvMessageHandler?: (data: any) => void) {
   const highlightBox = ref<HTMLDivElement | null>(null)
   const dpr = window.devicePixelRatio || 1
   const highlightRects = ref([] as HighlightRect[])
@@ -36,7 +36,13 @@ export function useHighlight() {
     return rect && rect.y < 60 ? 'bottom' : 'top'
   })
 
-  const shortcuts = computed(() => PickShortCuts[pickMode.value] || [])
+  const shortcuts = computed(() => {
+    const pickKey = pickMode.value === PickMode.CV ? (pickMode.value + pickStep.value) as PickMode : pickMode.value
+    console.log('pickKey: ', pickKey);
+    const shortCuts = PickShortCuts[pickKey]
+    console.log('shortCuts: ', shortCuts);
+    return PickShortCuts[pickKey] || []
+  })
 
   const highlightShow = computed(() => {
     const rect = highlightRects.value[0]
@@ -44,7 +50,7 @@ export function useHighlight() {
   })
 
   const cvCropShow = computed(() => {
-    return pickMode.value === PickMode.CV && pickStep.value === PickStep.CROPPED
+    return pickStep.value === PickStep.CV_CTRL || pickStep.value === PickStep.CV_ALT
   })
 
   const setPickStep = (step: PickStep) => {
@@ -54,6 +60,8 @@ export function useHighlight() {
     tooltipVisible.value = false
     highlightRects.value = []
     highlightBox.value && (highlightBox.value.innerHTML = '')
+    setPickStep(PickStep.DEFAULT)
+    window.location.reload()
   }
   onUnmounted(() => {
     if (rafId !== null) {
@@ -63,14 +71,17 @@ export function useHighlight() {
   })
 
   const handleShortcutKey = (key: ShortCutKey) => {
+    key = key?.toLowerCase() as ShortCutKey
     if (key === ShortCutKey.CTRL && pickMode.value === PickMode.CV) {
-      setPickStep(PickStep.CROPPED)
+      setPickStep(PickStep.CV_CTRL)
+      windowManager.setMouseIgnore(false)
     }
     if (key === ShortCutKey.ALT && pickMode.value === PickMode.CV) {
-      setPickStep(PickStep.SMART)
+      setPickStep(PickStep.CV_ALT)
+      windowManager.setMouseIgnore(false)
     }
     if (key === ShortCutKey.SHIFT && pickMode.value === PickMode.CV) {
-      setPickStep(PickStep.PICKING)
+      setPickStep(PickStep.DEFAULT)
     }
   }
 
@@ -149,6 +160,13 @@ export function useHighlight() {
       x: data.MouseX,
       y: data.MouseY,
     }
+    highlightRects.value = data.Boxes.map(box => ({
+      x: box.Left,
+      y: box.Top,
+      width: box.Right - box.Left,
+      height: box.Bottom - box.Top,
+      tag: box.Msg,
+    }))
     pendingDrawData = data
     if (rafId === null) {
       rafId = requestAnimationFrame(renderFrame)
@@ -160,15 +178,19 @@ export function useHighlight() {
       case 'start':
         windowManager.showWindow()
         if (data.Type) pickMode.value = data.Type
+        console.log('start: ', data);
         tooltipVisible.value = data.Type !== PickMode.VALIDATE
         break
       case 'hide':
+        console.log('hide: ', data);
         highlightRects.value = []
         hideAll()
-        // windowManager.hideWindow()
         break
       case 'draw':
         handleDraw(data)
+        break
+      case 'mouse_move':
+        mousePos.value = { x: data.MouseX, y: data.MouseY }
         break
       default:
         break
@@ -176,11 +198,17 @@ export function useHighlight() {
   }
 
   const handleMessage = (data: MessageType) => {
-    console.log('bindMessage data: ', data);
+    // console.log('bindMessage data: ', data);
     const op = data.Operation
     const shortcut = data.ShortcutKey
     handleShortcutKey(shortcut)
     handleOperation(op, data)
+
+    // 如果是 CV 模式，同时传递给 CV 消息处理器
+    if (pickMode.value === PickMode.CV && cvMessageHandler) {
+      cvMessageHandler(data)
+    }
+
     windowManager.setWindowAlwaysOnTop(true)
   }
 
@@ -190,6 +218,8 @@ export function useHighlight() {
       pickMode.value = pickModeFromUrl
       if (pickMode.value === PickMode.CV) {
         windowManager.setMouseIgnore(false)
+      } else {
+        windowManager.setMouseIgnore(true)
       }
     }
     windowManager.showWindow()
@@ -199,12 +229,15 @@ export function useHighlight() {
       })
     })
     RpaHighlight.bindClose(() => {
-      tooltipVisible.value = false
-      highlightRects.value = []
+      console.log('Highlight bindClose called')
+      hideAll()
     })
     RpaHighlight.bindError(() => {
       message.error('Highlight WebSocket is unavailable')
     })
+  })
+  onUnmounted(() => {
+    RpaHighlight.destroy()
   })
 
   return {
@@ -220,6 +253,7 @@ export function useHighlight() {
     shortcuts,
     highlightShow,
     cvCropShow,
+    pickStep,
     setPickStep,
   }
 }

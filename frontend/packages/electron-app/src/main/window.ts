@@ -23,6 +23,7 @@ export function sendElectronInfo(win: BrowserWindow) {
 
 function createWindow(options: Electron.BrowserWindowConstructorOptions, label?: string) {
   if (label && WindowStack.has(label)) {
+    console.warn(`Window with label ${label} already exists, focusing it instead of creating a new one.`)
     logger.warn(`Window with label ${label} already exists, focusing it instead of creating a new one.`)
     const win = WindowStack.get(label)
     if (win) {

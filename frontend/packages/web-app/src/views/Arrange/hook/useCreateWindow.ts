@@ -60,7 +60,7 @@ export function useCreateWindow() {
     const pickMode = 'normal'
     const url = `${baseUrl}/highlight.html?pickMode=${pickMode}`
     const options: CreateWindowOptions = {
-      show: false,
+      show: true,
       url,
       title: 'Highlight',
       label: WINDOW_NAME.HIGHLIGHT,
@@ -79,7 +79,7 @@ export function useCreateWindow() {
       movable: false,              // 不可移动
       minimizable: false,          // 不可最小化
       fullscreenable: true,
-      mouseIgnore: true,
+      // mouseIgnore: true,
     }
     await windowManager.createWindow(options, () => {
       

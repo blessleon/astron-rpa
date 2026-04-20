@@ -3,7 +3,7 @@ export enum PickMode {
   NORMAL = 'normal',
   SMART = 'smart',
   CV = 'vision',
-  DESIGNATE   = 'designate_pick', // CV 模式的分割，用于区分普通CV拾取和指定区域拾取
+  DESIGNATE = 'designate_pick', // CV 模式的分割，用于区分普通CV拾取和指定区域拾取
   WINDOW = 'window',
   ELEMENT = "element",
   POINT = "point",
@@ -13,19 +13,17 @@ export enum PickMode {
 }
 
 export enum PickStep {
-  "" = 'default',
-  DEFAULT = 'default',
-  PICKING = 'picking',
+  DEFAULT = '',
+  CV_CTRL = 'cv_ctrl',
+  CV_ALT = 'cv_alt',
   PICKED = 'picked',
-  CROPPED = 'cropped',
-  SMART = 'smart',
 }
 
 export enum ShortCutKey {
   CTRL = 'ctrl',
-  ALT = 'Alt',
-  SHIFT = 'Shift',
-  ESC = 'Escape',
+  ALT = 'alt',
+  SHIFT = 'shift',
+  ESC = 'esc',
 }
 
 export const PickTip = {
@@ -65,10 +63,34 @@ const cvShortCuts = [
   }
 ]
 
+const cvCtrlShortCuts = [
+  {
+    title: "返回上层",
+    keys: 'Shift',
+  },
+  {
+    title: "退出",
+    keys: 'Esc',
+  }
+]
+
+const cvAltShortCuts = [
+  {
+    title: "返回上层",
+    keys: 'Shift',
+  },
+  {
+    title: "退出",
+    keys: 'Esc',
+  }
+]
+
 export const PickShortCuts = {
   [PickMode.NORMAL]: defaultShortCuts,
   [PickMode.SMART]: defaultShortCuts,
   [PickMode.CV]: cvShortCuts,
+  [PickMode.CV + PickStep.CV_CTRL]: cvCtrlShortCuts,
+  [PickMode.CV + PickStep.CV_ALT]: cvAltShortCuts,
   [PickMode.WINDOW]: defaultShortCuts,
   [PickMode.ELEMENT]: defaultShortCuts,
   [PickMode.POINT]: defaultShortCuts,
