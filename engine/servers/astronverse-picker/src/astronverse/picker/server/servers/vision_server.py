@@ -180,13 +180,28 @@ class VisionServer:
 
                 elif mode == "ctrl":
                     hl.cv_shortcutkey_sync("ctrl")
-                    # 需求2+3：等 CONFIRM，期间 ESC 可中断
                     confirm_result = self._wait_ctrl_confirm(key_event, key_lock)
                     if confirm_result == "cancel":
                         hl.hide_sync()
                         return "cancel"
+                    box = confirm_result[0]
+                    target_rect_ltrb = (box["Left"], box["Top"], box["Right"], box["Bottom"])
+                    l, t, r, b = box["Left"], box["Top"], box["Right"], box["Bottom"]
+                    partial_rect = (0, 0, desktop_image.width, desktop_image.height)
+                    target_img = pyautogui.screenshot(region=(l, t, r - l, b - t))
+                    
+                    import sys
+                    import platform as _platform
+                    if sys.platform == "win32":
+                        from astronverse.vision_picker.core.core_win import PickCore
+                    elif _platform.system() == "Linux":
+                        from astronverse.vision_picker.core.core_unix import PickCore
+                    else:
+                        from astronverse.vision_picker.core.core_mac import PickCore
+                    pick_result = PickCore.json_res(target_img, target_rect_ltrb, None, None, partial_rect)
+
                     hl.hide_sync()
-                    return {"Boxes": confirm_result}
+                    return pick_result if pick_result else "cancel"
 
                 time.sleep(0.05)
         finally:
