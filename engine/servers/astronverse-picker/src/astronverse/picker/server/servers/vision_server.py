@@ -180,6 +180,7 @@ class VisionServer:
 
                 elif mode == "ctrl":
                     hl.cv_shortcutkey_sync("ctrl")
+                    screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
                     confirm_result = self._wait_ctrl_confirm(key_event, key_lock)
                     if confirm_result == "cancel":
                         hl.hide_sync()
