@@ -83,6 +83,16 @@ export function useCV() {
     sendFeedback('screenshot', { image: imageBase64 })
   }
 
+  const confirmCvAltPick = () => {
+    sendFeedback('confirm')
+    reset()
+  }
+
+  const reCvAltPick = () => {
+    sendFeedback('recapture')
+    reset()
+  }
+
   return {
     // 状态
     targetRect,
@@ -100,5 +110,7 @@ export function useCV() {
     continuePicking,
     sendScreenshot,
     reset,
+    confirmCvAltPick,
+    reCvAltPick,
   }
 }

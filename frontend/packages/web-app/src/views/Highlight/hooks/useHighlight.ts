@@ -7,6 +7,7 @@ import { message } from 'ant-design-vue'
 
 
 export function useHighlight() {
+  const highlightBox = ref<HTMLDivElement | null>(null)
   const dpr = window.devicePixelRatio || 1
   const highlightRects = ref([] as HighlightRect[])
   const mousePos = ref({ x: 0, y: 0 })
@@ -15,6 +16,8 @@ export function useHighlight() {
   const appName = ref('')
   const tooltipVisible = ref(false)
   let tooltipLastPos = 'leftTop'
+  let rafId: number | null = null
+  let pendingDrawData: MessageType | null = null
 
   const tooltipPos = computed(() => {
     const margin = 300
@@ -50,9 +53,13 @@ export function useHighlight() {
   const hideAll = () => {
     tooltipVisible.value = false
     highlightRects.value = []
+    highlightBox.value && (highlightBox.value.innerHTML = '')
   }
   onUnmounted(() => {
-
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId)
+      rafId = null
+    }
   })
 
   const handleShortcutKey = (key: ShortCutKey) => {
@@ -67,20 +74,84 @@ export function useHighlight() {
     }
   }
 
+  const renderFrame = () => {
+    rafId = null
+    if (!pendingDrawData) return
+
+    const data = pendingDrawData
+    pendingDrawData = null
+
+    const boxes = data.Boxes
+    if (!boxes || boxes.length === 0) return
+
+    const container = highlightBox.value
+    if (!container) return
+
+    const isValidateMode = pickMode.value === PickMode.VALIDATE
+    const firstBox = boxes[0]
+    const tagPos = firstBox && (firstBox.Top < 60) ? 'bottom' : 'top'
+
+    if (isValidateMode) {
+      container.innerHTML = ''
+      const fragment = document.createDocumentFragment()
+      boxes.forEach((box: any) => {
+        const div = document.createElement('div')
+        div.className = 'highlight-box highlight-box-validate'
+        const x = box.Left / dpr
+        const y = box.Top / dpr
+        const width = (box.Right - box.Left) / dpr
+        const height = (box.Bottom - box.Top) / dpr
+        div.style.cssText = `transform:translate(${x}px,${y}px);width:${width}px;height:${height}px`
+        if (box.Msg) {
+          const span = document.createElement('span')
+          span.className = tagPos === 'top' ? 'highlight-tag highlight-tag-top' : 'highlight-tag highlight-tag-bottom'
+          span.textContent = box.Msg
+          div.appendChild(span)
+        }
+        fragment.appendChild(div)
+      })
+      container.appendChild(fragment)
+      return
+    }
+
+    // non-validate modes always have a single box — reuse existing element
+    const box = firstBox
+    const x = box.Left / dpr
+    const y = box.Top / dpr
+    const width = (box.Right - box.Left) / dpr
+    const height = (box.Bottom - box.Top) / dpr
+    const cssText = `transform:translate(${x}px,${y}px);width:${width}px;height:${height}px`
+
+    let div = container.firstElementChild as HTMLDivElement | null
+    if (!div) {
+      div = document.createElement('div')
+      div.className = 'highlight-box'
+      container.appendChild(div)
+    }
+    div.style.cssText = cssText
+
+    if (box.Msg) {
+      let span = div.firstElementChild as HTMLSpanElement | null
+      if (!span) {
+        span = document.createElement('span')
+        div.appendChild(span)
+      }
+      span.className = tagPos === 'top' ? 'highlight-tag highlight-tag-top' : 'highlight-tag highlight-tag-bottom'
+      span.textContent = box.Msg
+    } else {
+      const span = div.firstElementChild
+      if (span) div.removeChild(span)
+    }
+  }
+
   const handleDraw = (data: MessageType) => {
     mousePos.value = {
       x: data.MouseX,
       y: data.MouseY,
     }
-    const boxes = data.Boxes
-    if (boxes && boxes.length > 0) {
-      highlightRects.value = boxes.map((box: any) => ({
-        x: box.Left,
-        y: box.Top,
-        width: (box.Right - box.Left) / dpr,
-        height: (box.Bottom - box.Top) / dpr,
-        tag: box.Msg,
-      }))
+    pendingDrawData = data
+    if (rafId === null) {
+      rafId = requestAnimationFrame(renderFrame)
     }
   }
 
@@ -104,6 +175,15 @@ export function useHighlight() {
     }
   }
 
+  const handleMessage = (data: MessageType) => {
+    console.log('bindMessage data: ', data);
+    const op = data.Operation
+    const shortcut = data.ShortcutKey
+    handleShortcutKey(shortcut)
+    handleOperation(op, data)
+    windowManager.setWindowAlwaysOnTop(true)
+  }
+
   onMounted(() => {
     const pickModeFromUrl = new URLSearchParams(window.location.search).get('pickMode') as PickMode
     if (pickModeFromUrl) {
@@ -115,12 +195,7 @@ export function useHighlight() {
     windowManager.showWindow()
     RpaHighlight.create(() => {
       RpaHighlight.bindMessage((data) => {
-        console.log('bindMessage data: ', data);
-        const op = data.Operation
-        const shortcut = data.ShortcutKey
-        handleShortcutKey(shortcut)
-        handleOperation(op, data)
-        windowManager.setWindowAlwaysOnTop(true)
+        handleMessage(data)
       })
     })
     RpaHighlight.bindClose(() => {
@@ -133,6 +208,7 @@ export function useHighlight() {
   })
 
   return {
+    highlightBox,
     dpr,
     highlightRects,
     mousePos,

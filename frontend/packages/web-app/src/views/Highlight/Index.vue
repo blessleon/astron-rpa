@@ -7,6 +7,7 @@ import CV from './CV.vue'
 import { PickMode } from './config';
 
 const {
+  highlightBox,
   dpr,
   highlightRects,
   mousePos,
@@ -25,19 +26,7 @@ window['setPickStep'] = setPickStep
 
 <template>
     <div class="highlight-overlay">
-      <div :class="`highlight-area  ${pickMode === PickMode.VALIDATE ? 'highlight-area-validate' : ''}`">
-        <div
-          v-for="item in highlightRects"
-          :class="`highlight-box ${pickMode === PickMode.VALIDATE ? 'highlight-box-validate' : ''}`"
-          :style="{
-            transform: `translate(${item.x / dpr}px, ${item.y / dpr}px)`,
-            width: item.width + 'px',
-            height: item.height + 'px',
-          }">
-          <span v-show="item.tag" :class="`highlight-tag ${tagPosition === 'top' ? 'highlight-tag-top' : 'highlight-tag-bottom'}`">
-            {{ item.tag }}
-          </span>
-        </div>
+      <div ref="highlightBox" :class="`highlight-area  ${pickMode === PickMode.VALIDATE ? 'highlight-area-validate' : ''}`">
       </div>
 
       <CV v-if="cvCropShow" />
@@ -75,7 +64,7 @@ window['setPickStep'] = setPickStep
   border: 2px solid var(--color-primary);
   background: #716fff28;
   pointer-events: none;
-  transition: all 0.2s ease-out;
+  transition: all 0.01s ease-out;
   border-radius: 4px;
 
   .highlight-tag {
@@ -86,7 +75,7 @@ window['setPickStep'] = setPickStep
     font-size: 12px;
     border-radius: 4px;
     white-space: nowrap;
-    transition: all 0.2s ease-out;
+   transition: all 0.01s ease-out;
 
     &-top {
       top: -26px;
