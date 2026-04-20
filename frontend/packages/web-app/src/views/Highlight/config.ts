@@ -2,7 +2,8 @@ export enum PickMode {
   "" = 'normal',
   NORMAL = 'normal',
   SMART = 'smart',
-  CV = 'vision_wait',
+  CV = 'vision',
+  DESIGNATE   = 'designate_pick', // CV 模式的分割，用于区分普通CV拾取和指定区域拾取
   WINDOW = 'window',
   ELEMENT = "element",
   POINT = "point",

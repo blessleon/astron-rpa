@@ -12,8 +12,8 @@ export const useCvPickStore = defineStore('cvPickStore', () => {
 
   const pickTypeMap = { // Cv拾取拾取类型传ELEMENT
     '': 'ELEMENT',
-    'cv': 'ELEMENT',
-    'CV': 'ELEMENT',
+    'cv': 'VISION',
+    'CV': 'VISION',
   }
   const pickerType = ref('')
   // 拾取结束

@@ -14,17 +14,18 @@ export function useHighlight() {
   const pickStep = ref('' as PickStep)
   const appName = ref('')
   const tooltipVisible = ref(false)
+  let tooltipLastPos = 'leftTop'
 
   const tooltipPos = computed(() => {
     const margin = 300
     const mouse = mousePos.value
     if (mouse.x < margin && mouse.y < margin) {
-      return 'rightBottom'
+      tooltipLastPos = 'rightBottom'
     }
     if (mouse.x > (screen.width - margin) * dpr && mouse.y > (screen.height - margin) * dpr) {
-      return 'leftTop'
+      tooltipLastPos = 'leftTop'
     }
-    return 'rightBottom'
+    return tooltipLastPos
   })
 
   const tagPosition = computed(() => {
@@ -125,7 +126,6 @@ export function useHighlight() {
     RpaHighlight.bindClose(() => {
       tooltipVisible.value = false
       highlightRects.value = []
-      message.warning('Highlight WebSocket closed')
     })
     RpaHighlight.bindError(() => {
       message.error('Highlight WebSocket is unavailable')
