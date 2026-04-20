@@ -109,5 +109,6 @@ export interface MessageType {
   MouseY?: number
   Boxes?: DrawRect[],
   Type?: PickMode,
-  Operation: string
+  Operation: string,
+  ShortcutKey?: ShortCutKey,
 }
