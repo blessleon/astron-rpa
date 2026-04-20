@@ -104,6 +104,7 @@ class VisionServer:
         5. 确认 → check_target → 返回结果
         6. ESC / 超时 → 返回 "cancel"
         """
+        logger.info("VisionServer: _run_start 开始执行")
         hl = self.svc.ws_server.hl
 
         # 通知 hl 进入等待模式
@@ -116,6 +117,7 @@ class VisionServer:
 
         def on_press(key):
             current_keys.add(key)
+            logger.info(f"on_press 触发: key={key}, current_keys_len={len(current_keys)}") 
             with key_lock:
                 if key == keyboard.Key.esc:
                     key_event["mode"] = "esc"
@@ -146,6 +148,7 @@ class VisionServer:
             timeout = 60 * 3  # 3 分钟超时
 
             while True:
+                # logger.info("VisionServer: 等待键盘事件")
                 if time.time() - start_time > timeout:
                     hl.hide_sync()
                     return "cancel"
@@ -153,7 +156,7 @@ class VisionServer:
                 with key_lock:
                     mode = key_event.get("mode")
                     key_event["mode"] = None
-
+                logger.info(f"VisionServer: 键盘事件 {mode}")
                 if mode == "esc":
                     hl.hide_sync()
                     return "cancel"
@@ -164,18 +167,15 @@ class VisionServer:
                     continue
 
                 if mode in ("alt", "ctrl"):
-                    # 请求截图（hl 会自动维护截图状态，无需手动 hide）
-                    # hl.request_screenshot_sync()
+                    # ✅ 第1步：先通知 hl 进入对应模式，hl 收到后才会截图回传
+                    hl.cv_shortcutkey_sync(mode)   # "alt" 或 "ctrl"
 
-                    # 等待 hl 回传截图
-                    screenshot_data = self._wait_feedback(
-                        VisionHlFeedback.SCREENSHOT, timeout_sec=10
-                    )
+                    # 第2步：再等 hl 回传截图
+                    screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
                     if screenshot_data is None:
                         logger.warning("VisionServer: 截图超时，重新等待")
                         continue
 
-                    # 解码截图
                     desktop_image = self._decode_screenshot(screenshot_data)
                     if desktop_image is None:
                         logger.warning("截图解码失败")
@@ -184,12 +184,8 @@ class VisionServer:
                     screen_w, screen_h = desktop_image.size
 
                     if mode == "alt":
-                        # ALT 模式：分割界面元素
-                        hl.cv_shortcutkey_sync("alt")
                         bboxes, partial_rect = self._detect_alt(desktop_image)
                     else:
-                        # CTRL 模式：全屏，无分割
-                        hl.cv_shortcutkey_sync("ctrl")
                         bboxes = None
                         partial_rect = (0, 0, screen_w, screen_h)
 
