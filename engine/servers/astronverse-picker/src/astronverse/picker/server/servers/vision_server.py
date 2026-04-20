@@ -95,46 +95,35 @@ class VisionServer:
     # ------------------------------------------------------------------
 
     def _run_start(self) -> str | None:
-        """
-        START 状态机：
-        1. 通知 hl 进入 vision_wait 模式
-        2. 监听键盘（Alt / Ctrl / ESC / Shift）
-        3. Alt → 接收截图 → 分割 → 鼠标追踪 → 等待确认
-        4. Ctrl → 接收截图 → 鼠标追踪（无分割）→ 等待确认
-        5. 确认 → check_target → 返回结果
-        6. ESC / 超时 → 返回 "cancel"
-        """
-        logger.info("VisionServer: _run_start 开始执行")
         hl = self.svc.ws_server.hl
-
-        # 通知 hl 进入等待模式
         hl.start_sync("vision")
 
-        # 键盘状态
         current_keys: set = set()
-        key_event: dict = {"mode": None}  # "alt" | "ctrl" | "esc" | "shift"
+        key_event: dict = {"mode": None}
         key_lock = threading.Lock()
+
+        # 需求1：全程鼠标追踪
+        mouse_stop = threading.Event()
+        def mouse_track_worker():
+            last_pos = None
+            while not mouse_stop.is_set():
+                cur_x, cur_y = pyautogui.position()
+                if (cur_x, cur_y) != last_pos:
+                    last_pos = (cur_x, cur_y)
+                    hl.mouse_move_sync(cur_x, cur_y)
+                time.sleep(0.05)
+        threading.Thread(target=mouse_track_worker, daemon=True).start()
 
         def on_press(key):
             current_keys.add(key)
-            logger.info(f"on_press 触发: key={key}, current_keys_len={len(current_keys)}") 
             with key_lock:
                 if key == keyboard.Key.esc:
                     key_event["mode"] = "esc"
-                elif (
-                        key in (keyboard.Key.alt_l, keyboard.Key.alt_gr)
-                        and len(current_keys) == 1
-                ):
+                elif key in (keyboard.Key.alt_l, keyboard.Key.alt_gr) and len(current_keys) == 1:
                     key_event["mode"] = "alt"
-                elif (
-                        key in (keyboard.Key.ctrl_l, keyboard.Key.ctrl_r)
-                        and len(current_keys) == 1
-                ):
+                elif key in (keyboard.Key.ctrl_l, keyboard.Key.ctrl_r) and len(current_keys) == 1:
                     key_event["mode"] = "ctrl"
-                elif (
-                        key in (keyboard.Key.shift_l, keyboard.Key.shift_r)
-                        and len(current_keys) == 1
-                ):
+                elif key in (keyboard.Key.shift_l, keyboard.Key.shift_r) and len(current_keys) == 1:
                     key_event["mode"] = "shift"
 
         def on_release(key):
@@ -145,10 +134,9 @@ class VisionServer:
 
         try:
             start_time = time.time()
-            timeout = 60 * 3  # 3 分钟超时
+            timeout = 60 * 3
 
             while True:
-                # logger.info("VisionServer: 等待键盘事件")
                 if time.time() - start_time > timeout:
                     hl.hide_sync()
                     return "cancel"
@@ -156,44 +144,27 @@ class VisionServer:
                 with key_lock:
                     mode = key_event.get("mode")
                     key_event["mode"] = None
-                logger.info(f"VisionServer: 键盘事件 {mode}")
+
                 if mode == "esc":
                     hl.hide_sync()
                     return "cancel"
 
                 if mode == "shift":
                     hl.cv_initialize_sync("SHIFT")
-                    # 重置，继续等待
                     continue
 
-                if mode in ("alt", "ctrl"):
-                    # ✅ 第1步：先通知 hl 进入对应模式，hl 收到后才会截图回传
-                    hl.cv_shortcutkey_sync(mode)   # "alt" 或 "ctrl"
-
-                    # 第2步：再等 hl 回传截图
+                if mode == "alt":
+                    hl.cv_shortcutkey_sync("alt")
                     screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
                     if screenshot_data is None:
                         logger.warning("VisionServer: 截图超时，重新等待")
                         continue
-
                     desktop_image = self._decode_screenshot(screenshot_data)
                     if desktop_image is None:
-                        logger.warning("截图解码失败")
                         continue
-
                     screen_w, screen_h = desktop_image.size
-
-                    if mode == "alt":
-                        bboxes, partial_rect = self._detect_alt(desktop_image)
-                    else:
-                        bboxes = None
-                        partial_rect = (0, 0, screen_w, screen_h)
-
-                    # 鼠标追踪循环
-                    result = self._mouse_track_loop(
-                        hl, desktop_image, bboxes, screen_w, screen_h
-                    )
-
+                    bboxes, partial_rect = self._detect_alt(desktop_image)
+                    result = self._mouse_track_loop(hl, desktop_image, bboxes, screen_w, screen_h)
                     if result == "cancel":
                         hl.hide_sync()
                         return "cancel"
@@ -201,18 +172,25 @@ class VisionServer:
                         hl.cv_initialize_sync("SHIFT")
                         continue
                     if result is not None:
-                        # 有目标 rect，进行 check_target
                         pick_result = self._check_target(result, desktop_image, bboxes, partial_rect)
                         if pick_result:
                             hl.hide_sync()
                             return pick_result
-                        else:
-                            # 目标获取失败，重新等待
-                            # hl.cv_start_sync("vision_wait")
-                            continue
+                        continue
+
+                elif mode == "ctrl":
+                    hl.cv_shortcutkey_sync("ctrl")
+                    # 需求2+3：等 CONFIRM，期间 ESC 可中断
+                    confirm_result = self._wait_ctrl_confirm(key_event, key_lock)
+                    if confirm_result == "cancel":
+                        hl.hide_sync()
+                        return "cancel"
+                    hl.hide_sync()
+                    return {"Boxes": confirm_result}
 
                 time.sleep(0.05)
         finally:
+            mouse_stop.set()
             listener.stop()
 
     def _mouse_track_loop(self, hl, desktop_image, bboxes, screen_w, screen_h):
@@ -248,7 +226,7 @@ class VisionServer:
                         return (b["Left"], b["Top"], b["Right"], b["Bottom"])
                     return draw_rect
                 elif fb_type == VisionHlFeedback.CONTINUE.value:
-                    return "shift"
+                    continue
             except queue.Empty:
                 pass
 
@@ -608,7 +586,36 @@ class VisionServer:
     # ------------------------------------------------------------------
     # 工具方法
     # ------------------------------------------------------------------
+    def _wait_ctrl_confirm(self, key_event: dict, key_lock: threading.Lock, timeout_sec: float = 60 * 3):
+        """
+        ctrl 模式下等待 hl 回传 CONFIRM，
+        期间监听 ESC 可随时取消
+        返回：Boxes dict | "cancel"
+        """
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            # 检查 ESC
+            with key_lock:
+                mode = key_event.get("mode")
+                if mode == "esc":
+                    key_event["mode"] = None
+                    return "cancel"
 
+            # 检查 hl feedback
+            try:
+                feedback = self._hl_feedback_queue.get(timeout=0.05)
+                fb_type = feedback.get("feedback_type")
+                if fb_type == VisionHlFeedback.CONFIRM.value:
+                    boxes = feedback.get("data", {}).get("Boxes", [])
+                    if boxes:
+                        return boxes  # 直接返回 Boxes 列表
+                    return "cancel"
+                # 非预期类型放回
+                self._hl_feedback_queue.put(feedback)
+            except queue.Empty:
+                pass
+
+        return "cancel"
     def _wait_feedback(self, expected_type: VisionHlFeedback, timeout_sec: float = 10) -> dict | None:
         """阻塞等待指定类型的 hl feedback，超时返回 None"""
         deadline = time.time() + timeout_sec
