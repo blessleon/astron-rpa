@@ -150,7 +150,7 @@ class VisionServer:
                     return "cancel"
 
                 if mode == "shift":
-                    hl.cv_initialize_sync("SHIFT")
+                    hl.cv_initialize_sync("shift")
                     continue
 
                 if mode == "alt":
@@ -169,7 +169,7 @@ class VisionServer:
                         hl.hide_sync()
                         return "cancel"
                     if result == "shift":
-                        hl.cv_initialize_sync("SHIFT")
+                        hl.cv_initialize_sync("shift")
                         continue
                     if result is not None:
                         pick_result = self._check_target(result, desktop_image, bboxes, partial_rect)
