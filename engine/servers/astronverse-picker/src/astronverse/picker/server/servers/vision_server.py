@@ -418,8 +418,8 @@ class VisionServer:
                     bx, by, bw, bh = hit_box
                     target_rect_obj = Rect(bx, by, bx + bw, by + bh)
                     hl.designate_pick_sync(
-                        target_rect=None,
-                        anchor_rect=target_rect_obj,
+                        target_rect=target_rect_obj,
+                        anchor_rect=None,
                         event="click_confirm",
                     )
 
