@@ -81,7 +81,7 @@ const {
   pointer-events: none;
   transition: all 0.01s ease-out;
   border-radius: 4px;
-
+  z-index: 99999;
   .highlight-tag {
     position: absolute;
     background: #1c1c1c;

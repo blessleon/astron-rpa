@@ -27,13 +27,13 @@ const hasSelection = ref(false)
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const dpr = window.devicePixelRatio || 1
 
-// cv_alt 模式：显示智能拾取的高亮位置
-const isCvAltMode = computed(() => props.cvStep === 'cv_alt')
-// cv_alt 模式下，有 targetRect 即视为有选区
+// PickStep.ALT 模式：显示智能拾取的高亮位置
+const isCvAltMode = computed(() => props.cvStep === PickStep.ALT)
+// PickStep.ALT 模式下，有 targetRect 即视为有选区
 const hasAltSelection = computed(() => isCvAltMode.value && !!props.targetRect)
 
 const selection = computed(() => {
-  // cv_alt 模式：使用后端返回的 targetRect
+  // PickStep.ALT 模式：使用后端返回的 targetRect
   if (isCvAltMode.value && props.targetRect) {
     return {
       x: props.targetRect.Left / dpr,
@@ -112,7 +112,7 @@ const actionBarStyle = computed(() => {
 
 // ─── Mouse event handlers ─────────────────────────────────────────────────────
 function onMouseDown(e: MouseEvent) {
-  // cv_alt 模式下禁用手动选择
+  // PickStep.ALT 模式下禁用手动选择
   if (isCvAltMode.value) return
   if (e.button !== 0) return
   // 点击按钮区域时不重置选区
@@ -179,7 +179,7 @@ function saveSelection() {
   }
 }
 
-// cv_alt 模式的操作
+// PickStep.ALT 模式的操作
 function confirmAltSelection() {
   emit('confirmAlt')
 }
@@ -197,7 +197,7 @@ onMounted(async () => {
       screenshotDataUrl.value = dataUrl as string
     }
     if (props.cvStep === PickStep.ALT) {
-      // cv_alt 模式下直接显示后端分析的选区，不允许手动选择
+      // PickStep.ALT 模式下直接显示后端分析的选区，不允许手动选择
       hasSelection.value = false
       emit('sendScreenshot', screenshotDataUrl.value)
     }
@@ -217,8 +217,16 @@ onMounted(async () => {
     <!-- 截图作为全屏背景 -->
     <img v-if="screenshotDataUrl" class="cv-screenshot" :src="screenshotDataUrl" draggable="false" alt="" />
 
+    <div v-if="isCvAltMode">
+      <!-- PickStep.ALT 模式：保存 / 重新选择 -->
+      <div v-if="hasAltSelection" class="cv-action-bar" :style="actionBarStyle">
+        <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="reselectAlt">{{ t('reselect') }}</button>
+        <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="confirmAltSelection">{{ t('save') }}</button>
+      </div>
+    </div>
+    <div v-else>
       <!-- 无选区时：整屏黑色半透明遮罩 -->
-      <div v-if="!isSelecting && !hasSelection && !isCvAltMode" class="cv-overlay cv-overlay--full" />
+      <div v-if="!isSelecting && !hasSelection" class="cv-overlay cv-overlay--full" />
 
       <!-- 有选区时：四块遮罩围绕选区，选区内透明 -->
       <template v-if="hasSelection || isSelecting">
@@ -229,32 +237,21 @@ onMounted(async () => {
       </template>
 
       <!-- 选区边框 + 角标 -->
-      <div
-        v-if="isSelecting || hasSelection"
-        class="cv-selection-box"
-        :style="selectionBoxStyle"
-      >
+      <div v-if="isSelecting || hasSelection" class="cv-selection-box" :style="selectionBoxStyle">
         <!-- <span class="cv-size-label">{{ selection.width }} × {{ selection.height }}</span> -->
         <span class="cv-corner cv-corner--tl" />
         <span class="cv-corner cv-corner--tr" />
         <span class="cv-corner cv-corner--bl" />
         <span class="cv-corner cv-corner--br" />
       </div>
-
-    <!-- cv_alt 模式：保存 / 重新选择 -->
-    <div v-if="hasAltSelection" class="cv-action-bar" :style="actionBarStyle">
-      <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="reselectAlt">{{ t('reselect') }}</button>
-      <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="confirmAltSelection">{{ t('save') }}</button>
+      <!-- cv_ctrl 模式：取消 / 保存 -->
+      <div v-else-if="hasSelection && !isSelecting" class="cv-action-bar" :style="actionBarStyle">
+        <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="cancelSelection">{{ t('cancel') }}</button>
+        <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="saveSelection">{{ t('save') }}</button>
+      </div>
+      <!-- 提示信息 -->
+      <div v-else-if="!hasSelection && !isSelecting && !isCvAltMode" class="cv-tip">{{ t('dragToSelect') }}</div>
     </div>
-
-    <!-- cv_ctrl 模式：取消 / 保存 -->
-    <div v-else-if="hasSelection && !isSelecting" class="cv-action-bar" :style="actionBarStyle">
-      <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="cancelSelection">{{ t('cancel') }}</button>
-      <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="saveSelection">{{ t('save') }}</button>
-    </div>
-
-    <!-- 提示信息 -->
-    <div v-else-if="!hasSelection && !isSelecting && !isCvAltMode" class="cv-tip">{{ t('dragToSelect') }}</div>
   </div>
 </template>
 
