@@ -416,8 +416,12 @@ class VisionServer:
                 )
                 if hit_box is not None:
                     bx, by, bw, bh = hit_box
-                    draw_rect = hit_box
-                    hl.draw_sync(Rect(bx, by, bx + bw, by + bh), "", "vision_pick")
+                    target_rect_obj = Rect(bx, by, bx + bw, by + bh)
+                    hl.designate_pick_sync(
+                        target_rect=None,
+                        anchor_rect=target_rect_obj,
+                        event="click_confirm",
+                    )
 
             # 检查 hl feedback
             try:
