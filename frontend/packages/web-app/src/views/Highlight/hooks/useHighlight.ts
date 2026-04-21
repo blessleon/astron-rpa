@@ -38,19 +38,19 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
   })
   // 快捷键提示根据拾取模式动态调整
   const shortcuts = computed(() => {
-    const pickKey = pickMode.value === PickMode.CV ? (pickMode.value + pickStep.value) as PickMode : pickMode.value
-    const shortCuts = PickShortCuts.value[pickKey]
+    const pickKey = pickMode.value === PickMode.VISION ? (pickMode.value + pickStep.value) as PickMode : pickMode.value
+    const shortCuts = PickShortCuts[pickKey]
     console.log('shortCuts: ', shortCuts);
-    return PickShortCuts.value[pickKey] || []
+    return shortCuts || []
   })
   // 高亮区域是否显示（CV模式下由CV组件控制）
   const highlightShow = computed(() => {
     const rect = highlightRects.value[0]
-    return rect && rect.width > 0 && rect.height > 0 && pickMode.value !== PickMode.CV
+    return rect && rect.width > 0 && rect.height > 0 && pickMode.value !== PickMode.VISION
   })
   // CV模式下的截图预览是否显示
   const cvCropShow = computed(() => {
-    return pickStep.value === PickStep.CV_CTRL || pickStep.value === PickStep.CV_ALT
+    return [PickStep.CTRL, PickStep.ALT].includes(pickStep.value) && pickMode.value === PickMode.VISION
   })
   // 设置拾取步骤（仅CV模式）
   const setPickStep = (step: PickStep) => {
@@ -65,15 +65,15 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
   // 处理快捷键，CV模式下Ctrl/Alt切换截图/智能识别，Shift返回上一步
   const handleShortcutKey = (key: ShortCutKey) => {
     key = key?.toLowerCase() as ShortCutKey
-    if (key === ShortCutKey.CTRL && pickMode.value === PickMode.CV) {
-      setPickStep(PickStep.CV_CTRL)
+    if (key === ShortCutKey.CTRL && pickMode.value === PickMode.VISION) {
+      setPickStep(PickStep.CTRL)
       windowManager.setMouseIgnore(false)
     }
-    if (key === ShortCutKey.ALT && pickMode.value === PickMode.CV) {
-      setPickStep(PickStep.CV_ALT)
+    if (key === ShortCutKey.ALT && pickMode.value === PickMode.VISION) {
+      setPickStep(PickStep.ALT)
       windowManager.setMouseIgnore(false)
     }
-    if (key === ShortCutKey.SHIFT && pickMode.value === PickMode.CV) {
+    if (key === ShortCutKey.SHIFT && pickMode.value === PickMode.VISION) {
       setPickStep(PickStep.DEFAULT)
     }
   }
@@ -93,20 +93,26 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
   }
   // 处理消息
   const handleOperation = (op: string, data: MessageType) => {
-    console.log('handleOperation: ', op, data);
     switch (op) {
       case 'start':
+        console.log('handleOperation: ', op, data);
         windowManager.showWindow()
         windowManager.setWindowAlwaysOnTop(true)
         if (data.Type) pickMode.value = data.Type
         if (data.Language) currentLocale.value = data.Language as any
         tooltipVisible.value = data.Type !== PickMode.VALIDATE
+        console.log('tooltipVisible.value: ', tooltipVisible.value);
+        if (pickMode.value !== PickMode.VISION) {
+          windowManager.setMouseIgnore(true)
+        }
         break
       case 'hide':
+        console.log('handleOperation: ', op, data);
         highlightRects.value = []
         hideAll()
         break
       case 'draw':
+        console.log('handleOperation: ', op, data);
         handleDraw(data)
         windowManager.setWindowAlwaysOnTop(true)
         break
@@ -125,20 +131,12 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
     handleOperation(op, data)
 
     // 如果是 CV 模式，同时传递给 CV 消息处理器
-    if (pickMode.value === PickMode.CV && cvMessageHandler) {
-      cvMessageHandler(data)
-    }
+    // if (pickMode.value === PickMode.CV && cvMessageHandler) {
+    //   cvMessageHandler(data)
+    // }
   }
 
   onMounted(() => {
-    const pickModeFromUrl = new URLSearchParams(window.location.search).get('pickMode') as PickMode
-    if (pickModeFromUrl) {
-      if (pickModeFromUrl === PickMode.CV) {
-        windowManager.setMouseIgnore(false)
-      } else {
-        windowManager.setMouseIgnore(true)
-      }
-    }
     windowManager.showWindow()
     RpaHighlight.create(() => {
       RpaHighlight.bindMessage((data) => {
@@ -148,9 +146,6 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
     RpaHighlight.bindClose(() => {
       console.log('Highlight bindClose called')
       hideAll()
-    })
-    RpaHighlight.bindError(() => {
-      message.error(t('wsUnavailable'))
     })
   })
   onUnmounted(() => {

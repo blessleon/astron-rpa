@@ -23,7 +23,6 @@ export function sendElectronInfo(win: BrowserWindow) {
 
 function createWindow(options: Electron.BrowserWindowConstructorOptions, label?: string) {
   if (label && WindowStack.has(label)) {
-    console.warn(`Window with label ${label} already exists, focusing it instead of creating a new one.`)
     logger.warn(`Window with label ${label} already exists, focusing it instead of creating a new one.`)
     const win = WindowStack.get(label)
     if (win) {
@@ -131,13 +130,15 @@ export function createSubWindow(options: CreateWindowOptions) {
   }
 
   const window = createWindow(subWindowOptions, options.label)
-  window.loadURL(url).then(() => sendElectronInfo(window)).catch(() => logger.error('Failed to load URL'))
-
+  if (window.webContents.getURL() === url) {
+    window.show()
+  } else {
+    window.loadURL(url).then(() => sendElectronInfo(window)).catch(() => logger.error('Failed to load URL'))
+  }
   if (options.mouseIgnore) {
     window.setIgnoreMouseEvents(true, { forward: true });
   }
   window.on('ready-to-show', () => {
-    // window?.openDevTools()
     if (options?.show !== false) {
       window.show()
     }

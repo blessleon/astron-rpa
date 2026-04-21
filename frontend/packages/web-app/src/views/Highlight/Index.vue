@@ -12,7 +12,6 @@ const { targetRect, confirmCvCtrlPick, confirmCvAltPick, sendScreenshot, reCvAlt
 
 const {
   mousePos,
-  // appName,
   pickMode,
   tooltipVisible,
   tooltipPos,
@@ -21,8 +20,7 @@ const {
   cvCropShow,
   pickStep,
   highlightRects,
-  setPickStep,
-} = useHighlight(handleCvMessage)
+} = useHighlight()
 
 </script>
 
@@ -53,7 +51,6 @@ const {
         @reselect-alt="reCvAltPick"
       />
       <div v-if="tooltipVisible" :class="`tooltip bg-bg-elevated ${tooltipPos === 'leftTop' ? 'tooltip-left-top' : 'tooltip-right-bottom'}`">
-        <!-- <div class="tooltip-item font-bold">{{ modeTitle }}</div> -->
         <div class="tooltip-item font-bold" v-for="(sc, i) in shortcuts" :key="i">
           <span :class="`short-title ${currentLocale === 'en_US' ? 'short-title-en':''}`" >{{ sc.title }}</span>
           <span class="short-keys">{{ sc.keys }}</span>
@@ -62,10 +59,6 @@ const {
           <span :class="`short-title ${currentLocale === 'en_US' ? 'short-title-en':''}`">{{ t('position') }}</span>
           <span class="short-xy">{{ mousePos.x }},{{ mousePos.y }}</span>
         </div>
-        <!-- <div class="tooltip-item" v-if="appName">
-          <span class="short-title">{{ t('application') }}</span>
-          <span class="short-">{{ appName }}</span>
-        </div> -->
       </div>
     </div>
 </template>
