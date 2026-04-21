@@ -94,10 +94,10 @@ class VisionServer:
         with self._lock:
             # logger.info(f"VisionServer _start_session lock_acquired action={action.value}")
             if self._active_thread and self._active_thread.is_alive():
-                logger.warning(
-                    f"VisionServer _start_session skipped action={action.value} "
-                    f"reason=active_thread_running thread={self._active_thread.name}"
-                )
+                # logger.warning(
+                #     f"VisionServer _start_session skipped action={action.value} "
+                #     f"reason=active_thread_running thread={self._active_thread.name}"
+                # )
                 return
             # 清空旧 feedback
             cleared = 0
@@ -329,6 +329,9 @@ class VisionServer:
                     if confirm_result == "cancel":
                         hl.hide_sync()
                         return self._cancel()
+                    if confirm_result == "shift":
+                        hl.cv_initialize_sync("shift")
+                        continue
                     box = confirm_result[0]
                     target_rect_ltrb = (box["Left"], box["Top"], box["Right"], box["Bottom"])
                     l, t, r, b = box["Left"], box["Top"], box["Right"], box["Bottom"]
@@ -869,8 +872,8 @@ class VisionServer:
     def _wait_ctrl_confirm(self, timeout_sec: float = 60 * 3):
         """
         ctrl 模式下等待 hl 回传 CONFIRM，
-        期间监听 ESC 可随时取消
-        返回：Boxes dict | "cancel"
+        期间监听 ESC/SHIFT，支持取消或返回初始化态
+        返回：Boxes dict | "cancel" | "shift"
         """
         deadline = time.time() + timeout_sec
         event_core = self.svc.event_core
@@ -882,6 +885,9 @@ class VisionServer:
             if event_core.is_cancel():
                 logger.info(f"VisionServer _wait_ctrl_confirm cancel session={self._current_session_id}")
                 return "cancel"
+            if event_core.is_shift_pressed():
+                logger.info(f"VisionServer _wait_ctrl_confirm shift session={self._current_session_id}")
+                return "shift"
             # 检查 hl feedback
             try:
                 feedback = self._hl_feedback_queue.get(timeout=0.05)
