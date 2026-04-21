@@ -5,6 +5,7 @@ import { ref, computed, onMounted } from 'vue'
 import { windowManager, utilsManager } from '@/platform'
 import { DrawRect } from './types.d'
 import { t } from './locale'
+import { PickStep } from './config';
 
 const props = defineProps<{
   cvStep: string
@@ -195,7 +196,7 @@ onMounted(async () => {
     if (dataUrl) {
       screenshotDataUrl.value = dataUrl as string
     }
-    if (props.cvStep === 'cv_alt') {
+    if (props.cvStep === PickStep.ALT) {
       // cv_alt 模式下直接显示后端分析的选区，不允许手动选择
       hasSelection.value = false
       emit('sendScreenshot', screenshotDataUrl.value)

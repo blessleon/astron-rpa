@@ -10,7 +10,6 @@ import { SMART_COMP_PICK_EVENT } from '@/constants/smartCompPick'
 import { utilsManager, windowManager } from '@/platform'
 
 import { useVariableStore } from './useVariableStore'
-import { useCreateWindow } from '@/hooks/useCreateWindow'
 
 export const useSmartCompPickStore = defineStore('smartCompPickStore', () => {
   const isPicking = ref(false) // 正在拾取
@@ -20,7 +19,6 @@ export const useSmartCompPickStore = defineStore('smartCompPickStore', () => {
   const variableStore = useVariableStore()
   const { t } = useTranslation()
   const { open: openPickMenuWindow } = useSmartCompPickWindow(resetPick)
-  const { openHighlightWindow } = useCreateWindow()
 
   utilsManager.listenEvent('w2w', ({ from, target, type: eventType }: any) => {
     if (!isPicking.value || from !== WINDOW_NAME.SMART_COMP_PICK_MENU || target !== WINDOW_NAME.MAIN) {
@@ -185,7 +183,6 @@ export const useSmartCompPickStore = defineStore('smartCompPickStore', () => {
   const startCheck = (data: any, callback: (params: { success: boolean, data: any }) => void) => {
     const ext_data = { global: variableStore.globalVariableList }
     // 启动校验
-    openHighlightWindow({ pickMode: 'VALIDATE' })
     RpaPicker.create(() => {
       windowManager.minimizeWindow()
       setTimeout(() => {
@@ -228,7 +225,6 @@ export const useSmartCompPickStore = defineStore('smartCompPickStore', () => {
 
   const startPickAction = (action: string, ofterSendCb?: () => void) => {
     // 启动拾取
-    openHighlightWindow({ pickMode: 'SMART_COMPONENT' })
     RpaPicker.create(() => {
       setTimeout(() => {
         const sendParams = {

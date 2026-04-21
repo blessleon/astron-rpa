@@ -14,10 +14,8 @@ import type { PickParams } from '@/types/resource'
 import { ElementPickModal } from '@/views/Arrange/components/pick'
 
 import { useVariableStore } from './useVariableStore'
-import { useCreateWindow } from '@/hooks/useCreateWindow'
 
 export const usePickStore = defineStore('pickStore', () => {
-  const { openHighlightWindow } = useCreateWindow()
   const isPicking = ref(false) // 正在拾取
   const isChecking = ref(false) // 正在校验
   const isDataPicking = ref(false) // 正在数据抓取
@@ -64,7 +62,6 @@ export const usePickStore = defineStore('pickStore', () => {
   // 开始鼠标位置拾取
   const startMousePick = (callback: (params: { success: boolean, data: any }) => void) => {
     // 启动拾取
-    openHighlightWindow({ pickMode:  pickTypeMap.POINT })
     RpaPicker.create(() => {
       const _pickType = pickTypeMap.POINT
       pickerType.value = _pickType
@@ -124,7 +121,6 @@ export const usePickStore = defineStore('pickStore', () => {
   const startPick = (type: string, element: any, callback: (params: { success: boolean, data: any }) => void, mode = '') => {
     type = type.toUpperCase()
     isPicking.value = true
-    openHighlightWindow({ pickMode:  pickTypeMap[type] })
     // 启动拾取
     RpaPicker.create(() => {
       const _pickType = pickTypeMap[type] || 'ELEMENT'
@@ -184,7 +180,6 @@ export const usePickStore = defineStore('pickStore', () => {
   // 开始校验
   const startCheck = (type: string, data: any, callback: (params: { success: boolean, data: any }) => void, finshType = 'maximize') => {
     // console.log('startCheck: ', data)
-    openHighlightWindow({ pickMode:  'VALIDATE' })
     type = type.toUpperCase()
     isChecking.value = true
     const ext_data = { global: variableStore.globalVariableList }
