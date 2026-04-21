@@ -61,18 +61,13 @@ class VisionServer:
     def on_hl_feedback(self, data: dict) -> None:
         """由 WsServer 在 hl 消息到达时调用（异步上下文，线程安全）"""
         logger.info(
-            "VisionServer on_hl_feedback session=%s type=%s queue_before=%s payload=%s",
-            self._current_session_id,
-            self._feedback_type(data),
-            self._queue_size(),
-            data,
+            f"VisionServer on_hl_feedback session={self._current_session_id} "
+            f"type={self._feedback_type(data)} queue_before={self._queue_size()} payload={data}"
         )
         self._hl_feedback_queue.put(data)
         logger.info(
-            "VisionServer on_hl_feedback queued session=%s type=%s queue_after=%s",
-            self._current_session_id,
-            self._feedback_type(data),
-            self._queue_size(),
+            f"VisionServer on_hl_feedback queued session={self._current_session_id} "
+            f"type={self._feedback_type(data)} queue_after={self._queue_size()}"
         )
 
     def handle(self, sign: dict) -> None:
@@ -91,19 +86,17 @@ class VisionServer:
     def _start_session(self, action: VisionAction, sign: dict) -> None:
         """启动独立线程运行状态机，单会话保护"""
         logger.info(
-            "VisionServer _start_session enter action=%s active_alive=%s queue=%s sign_keys=%s",
-            action.value,
-            bool(self._active_thread and self._active_thread.is_alive()),
-            self._queue_size(),
-            list(getattr(sign, "map", sign).keys()) if hasattr(sign, "map") else "unknown",
+            f"VisionServer _start_session enter action={action.value} "
+            f"active_alive={bool(self._active_thread and self._active_thread.is_alive())} "
+            f"queue={self._queue_size()} "
+            f"sign_keys={list(getattr(sign, 'map', sign).keys()) if hasattr(sign, 'map') else 'unknown'}"
         )
         with self._lock:
-            logger.info("VisionServer _start_session lock_acquired action=%s", action.value)
+            logger.info(f"VisionServer _start_session lock_acquired action={action.value}")
             if self._active_thread and self._active_thread.is_alive():
                 logger.warning(
-                    "VisionServer _start_session skipped action=%s reason=active_thread_running thread=%s",
-                    action.value,
-                    self._active_thread.name,
+                    f"VisionServer _start_session skipped action={action.value} "
+                    f"reason=active_thread_running thread={self._active_thread.name}"
                 )
                 return
             # 清空旧 feedback
@@ -115,11 +108,7 @@ class VisionServer:
                 except queue.Empty:
                     break
             if cleared:
-                logger.info(
-                    "VisionServer _start_session cleared_feedback action=%s cleared=%s",
-                    action.value,
-                    cleared,
-                )
+                logger.info(f"VisionServer _start_session cleared_feedback action={action.value} cleared={cleared}")
 
             data = sign[action.value]
             self._session_seq += 1
@@ -132,11 +121,9 @@ class VisionServer:
                 name=f"vision-{session_id}",
             )
             logger.info(
-                "VisionServer _start_session thread_start action=%s session=%s thread=%s data_keys=%s",
-                action.value,
-                session_id,
-                self._active_thread.name,
-                list(data.keys()) if isinstance(data, dict) else type(data).__name__,
+                f"VisionServer _start_session thread_start action={action.value} "
+                f"session={session_id} thread={self._active_thread.name} "
+                f"data_keys={list(data.keys()) if isinstance(data, dict) else type(data).__name__}"
             )
             self._active_thread.start()
 
@@ -145,11 +132,8 @@ class VisionServer:
         result_key = f"{action.value}_RES"
         result = None
         logger.info(
-            "VisionServer _run_session start session=%s action=%s thread=%s queue=%s",
-            session_id,
-            action.value,
-            threading.current_thread().name,
-            self._queue_size(),
+            f"VisionServer _run_session start session={session_id} action={action.value} "
+            f"thread={threading.current_thread().name} queue={self._queue_size()}"
         )
         try:
             if action == VisionAction.START:
@@ -159,14 +143,14 @@ class VisionServer:
             elif action == VisionAction.DESIGNATE:
                 result = self._run_designate(data)
         except Exception as e:
-            logger.error("VisionServer _run_session exception session=%s action=%s err=%s %s", session_id, action.value, e, traceback.format_exc())
+            logger.error(
+                f"VisionServer _run_session exception session={session_id} action={action.value} "
+                f"err={e} {traceback.format_exc()}"
+            )
             result = self._error("internal_error")
         finally:
             logger.info(
-                "VisionServer _run_session finish session=%s action=%s result=%s",
-                session_id,
-                action.value,
-                result,
+                f"VisionServer _run_session finish session={session_id} action={action.value} result={result}"
             )
             del sign[action.value]
             sign[result_key] = result
@@ -204,11 +188,11 @@ class VisionServer:
     def _run_start(self) -> dict:
         hl = self.svc.ws_server.hl
         event_core = self.svc.event_core
-        logger.info("VisionServer _run_start begin session=%s", self._current_session_id)
+        logger.info(f"VisionServer _run_start begin session={self._current_session_id}")
         hl.start_sync("vision")
-        logger.info("VisionServer _run_start hl.start_sync done session=%s", self._current_session_id)
+        logger.info(f"VisionServer _run_start hl.start_sync done session={self._current_session_id}")
         event_core.start()
-        logger.info("VisionServer _run_start event_core.start done session=%s", self._current_session_id)
+        logger.info(f"VisionServer _run_start event_core.start done session={self._current_session_id}")
 
         # 需求1：全程鼠标追踪
         mouse_stop = threading.Event()
@@ -232,65 +216,73 @@ class VisionServer:
 
             while True:
                 if time.time() - start_time > timeout:
-                    logger.warning("VisionServer _run_start timeout session=%s elapsed=%.3f", self._current_session_id, time.time() - start_time)
+                    logger.warning(
+                        f"VisionServer _run_start timeout session={self._current_session_id} "
+                        f"elapsed={time.time() - start_time:.3f}"
+                    )
                     hl.hide_sync()
                     return self._error("timeout")
 
                 if event_core.is_cancel():
-                    logger.info("VisionServer _run_start cancel_detected session=%s", self._current_session_id)
+                    logger.info(f"VisionServer _run_start cancel_detected session={self._current_session_id}")
                     hl.hide_sync()
                     return self._cancel()
 
                 now = time.time()
                 if now - last_signal_log > 1:
                     logger.info(
-                        "VisionServer _run_start heartbeat session=%s mode=%s ctrl=%s alt=%s shift=%s cancel=%s queue=%s",
-                        self._current_session_id,
-                        current_mode,
-                        event_core.is_ctrl_pressed(),
-                        event_core.is_alt_pressed(),
-                        event_core.is_shift_pressed(),
-                        event_core.is_cancel(),
-                        self._queue_size(),
+                        f"VisionServer _run_start heartbeat session={self._current_session_id} "
+                        f"mode={current_mode} ctrl={event_core.is_ctrl_pressed()} "
+                        f"alt={event_core.is_alt_pressed()} shift={event_core.is_shift_pressed()} "
+                        f"cancel={event_core.is_cancel()} queue={self._queue_size()}"
                     )
                     last_signal_log = now
 
                 if current_mode is None and self._has_signal(event_core, "shift"):
-                    logger.info("VisionServer _run_start shift_enter session=%s", self._current_session_id)
+                    logger.info(f"VisionServer _run_start shift_enter session={self._current_session_id}")
                     hl.cv_initialize_sync("shift")
                     current_mode = "shift"
                     continue
 
                 if current_mode == "shift" and not self._has_signal(event_core, "shift"):
-                    logger.info("VisionServer _run_start shift_release session=%s", self._current_session_id)
+                    logger.info(f"VisionServer _run_start shift_release session={self._current_session_id}")
                     current_mode = None
 
                 if current_mode is None and self._has_signal(event_core, "alt"):
                     current_mode = "alt"
-                    logger.info("VisionServer _run_start alt_enter session=%s queue=%s", self._current_session_id, self._queue_size())
+                    logger.info(
+                        f"VisionServer _run_start alt_enter session={self._current_session_id} queue={self._queue_size()}"
+                    )
                     hl.cv_shortcutkey_sync("alt")
-                    logger.info("VisionServer _run_start alt_shortcut_sent session=%s", self._current_session_id)
+                    logger.info(f"VisionServer _run_start alt_shortcut_sent session={self._current_session_id}")
                     screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
                     if screenshot_data is None:
-                        logger.warning("VisionServer _run_start alt_wait_screenshot_timeout session=%s", self._current_session_id)
+                        logger.warning(
+                            f"VisionServer _run_start alt_wait_screenshot_timeout session={self._current_session_id}"
+                        )
                         current_mode = None
                         continue
                     desktop_image = self._decode_screenshot(screenshot_data)
                     if desktop_image is None:
-                        logger.warning("VisionServer _run_start alt_decode_screenshot_failed session=%s", self._current_session_id)
+                        logger.warning(
+                            f"VisionServer _run_start alt_decode_screenshot_failed session={self._current_session_id}"
+                        )
                         current_mode = None
                         continue
                     screen_w, screen_h = desktop_image.size
-                    logger.info("VisionServer _run_start alt_screenshot_ready session=%s size=%sx%s", self._current_session_id, screen_w, screen_h)
+                    logger.info(
+                        f"VisionServer _run_start alt_screenshot_ready session={self._current_session_id} "
+                        f"size={screen_w}x{screen_h}"
+                    )
                     bboxes, partial_rect = self._detect_alt(desktop_image)
                     logger.info(
-                        "VisionServer _run_start alt_detect_done session=%s bbox_count=%s partial_rect=%s",
-                        self._current_session_id,
-                        len(bboxes) if bboxes else 0,
-                        partial_rect,
+                        f"VisionServer _run_start alt_detect_done session={self._current_session_id} "
+                        f"bbox_count={len(bboxes) if bboxes else 0} partial_rect={partial_rect}"
                     )
                     result = self._mouse_track_loop(hl, bboxes, screen_w, screen_h)
-                    logger.info("VisionServer _run_start alt_track_result session=%s result=%s", self._current_session_id, result)
+                    logger.info(
+                        f"VisionServer _run_start alt_track_result session={self._current_session_id} result={result}"
+                    )
                     current_mode = None
                     if result == "timeout":
                         hl.hide_sync()
@@ -309,12 +301,17 @@ class VisionServer:
                         continue
 
                 if current_mode is None and self._has_signal(event_core, "ctrl"):
-                    logger.info("VisionServer _run_start ctrl_enter session=%s queue=%s", self._current_session_id, self._queue_size())
+                    logger.info(
+                        f"VisionServer _run_start ctrl_enter session={self._current_session_id} queue={self._queue_size()}"
+                    )
                     current_mode = "ctrl"
                     hl.cv_shortcutkey_sync("ctrl")
-                    logger.info("VisionServer _run_start ctrl_shortcut_sent session=%s", self._current_session_id)
+                    logger.info(f"VisionServer _run_start ctrl_shortcut_sent session={self._current_session_id}")
                     confirm_result = self._wait_ctrl_confirm(timeout_sec=timeout)
-                    logger.info("VisionServer _run_start ctrl_confirm_result session=%s result=%s", self._current_session_id, confirm_result)
+                    logger.info(
+                        f"VisionServer _run_start ctrl_confirm_result session={self._current_session_id} "
+                        f"result={confirm_result}"
+                    )
                     current_mode = None
                     if confirm_result == "timeout":
                         hl.hide_sync()
@@ -326,42 +323,37 @@ class VisionServer:
                     target_rect_ltrb = (box["Left"], box["Top"], box["Right"], box["Bottom"])
                     l, t, r, b = box["Left"], box["Top"], box["Right"], box["Bottom"]
                     logger.info(
-                        "VisionServer _run_start ctrl_box session=%s box=%s width=%s height=%s",
-                        self._current_session_id,
-                        self._box_summary(box),
-                        r - l,
-                        b - t,
+                        f"VisionServer _run_start ctrl_box session={self._current_session_id} "
+                        f"box={self._box_summary(box)} width={r - l} height={b - t}"
                     )
                     desktop_image = None
                     screenshot_started = time.time()
                     target_img = pyautogui.screenshot(region=(l, t, r - l, b - t))
                     logger.info(
-                        "VisionServer _run_start ctrl_capture_done session=%s elapsed=%.3f size=%sx%s",
-                        self._current_session_id,
-                        time.time() - screenshot_started,
-                        getattr(target_img, "width", None),
-                        getattr(target_img, "height", None),
+                        f"VisionServer _run_start ctrl_capture_done session={self._current_session_id} "
+                        f"elapsed={time.time() - screenshot_started:.3f} "
+                        f"size={getattr(target_img, 'width', None)}x{getattr(target_img, 'height', None)}"
                     )
-                    logger.info("VisionServer _run_start ctrl_pickcore_ready session=%s", self._current_session_id)
+                    logger.info(f"VisionServer _run_start ctrl_pickcore_ready session={self._current_session_id}")
                     json_res_started = time.time()
-                    pick_result = PickCore.json_res(target_img, target_rect_ltrb, None, None, None)
+                    pick_result = PickCore.json_res(target_img, target_rect_ltrb, None, None, desktop_image)
                     logger.info(
-                        "VisionServer _run_start ctrl_json_res_done session=%s elapsed=%.3f has_result=%s",
-                        self._current_session_id,
-                        time.time() - json_res_started,
-                        bool(pick_result),
+                        f"VisionServer _run_start ctrl_json_res_done session={self._current_session_id} "
+                        f"elapsed={time.time() - json_res_started:.3f} has_result={bool(pick_result)}"
                     )
                     hl.hide_sync()
-                    logger.info("VisionServer _run_start ctrl_hide_done session=%s", self._current_session_id)
+                    logger.info(f"VisionServer _run_start ctrl_hide_done session={self._current_session_id}")
                     if pick_result:
-                        logger.info("VisionServer _run_start ctrl_success session=%s", self._current_session_id)
+                        logger.info(f"VisionServer _run_start ctrl_success session={self._current_session_id}")
                         return self._success(pick_result)
-                    logger.warning("VisionServer _run_start ctrl_target_not_found session=%s", self._current_session_id)
+                    logger.warning(
+                        f"VisionServer _run_start ctrl_target_not_found session={self._current_session_id}"
+                    )
                     return self._error("target_not_found")
 
                 time.sleep(0.05)
         finally:
-            logger.info("VisionServer _run_start finally session=%s", self._current_session_id)
+            logger.info(f"VisionServer _run_start finally session={self._current_session_id}")
             mouse_stop.set()
             event_core.close()
 
@@ -384,15 +376,15 @@ class VisionServer:
 
         while True:
             if time.time() - start_time > timeout:
-                logger.warning("VisionServer _mouse_track_loop timeout session=%s", self._current_session_id)
+                logger.warning(f"VisionServer _mouse_track_loop timeout session={self._current_session_id}")
                 return "timeout"
 
             if event_core.is_cancel():
-                logger.info("VisionServer _mouse_track_loop cancel session=%s", self._current_session_id)
+                logger.info(f"VisionServer _mouse_track_loop cancel session={self._current_session_id}")
                 return "cancel"
 
             if event_core.is_shift_pressed():
-                logger.info("VisionServer _mouse_track_loop shift session=%s", self._current_session_id)
+                logger.info(f"VisionServer _mouse_track_loop shift session={self._current_session_id}")
                 return "shift"
 
             # 检查 hl feedback
@@ -403,16 +395,14 @@ class VisionServer:
                     # hl 回传了确认的 rect
                     boxes = feedback.get("data", {}).get("Boxes", [])
                     logger.info(
-                        "VisionServer _mouse_track_loop confirm session=%s boxes=%s",
-                        self._current_session_id,
-                        boxes,
+                        f"VisionServer _mouse_track_loop confirm session={self._current_session_id} boxes={boxes}"
                     )
                     if boxes:
                         b = boxes[0]
                         return (b["Left"], b["Top"], b["Right"], b["Bottom"])
                     return draw_rect
                 elif fb_type == VisionHlFeedback.CONTINUE.value:
-                    logger.info("VisionServer _mouse_track_loop continue session=%s", self._current_session_id)
+                    logger.info(f"VisionServer _mouse_track_loop continue session={self._current_session_id}")
                     continue
             except queue.Empty:
                 pass
@@ -430,11 +420,8 @@ class VisionServer:
                 if new_rect != draw_rect:
                     draw_rect = new_rect
                     logger.info(
-                        "VisionServer _mouse_track_loop rect_change session=%s mouse=(%s,%s) rect=%s",
-                        self._current_session_id,
-                        cur_x,
-                        cur_y,
-                        draw_rect,
+                        f"VisionServer _mouse_track_loop rect_change session={self._current_session_id} "
+                        f"mouse=({cur_x},{cur_y}) rect={draw_rect}"
                     )
                     if draw_rect:
                         bx, by, bw, bh = draw_rect
@@ -471,13 +458,15 @@ class VisionServer:
         try:
             while True:
                 if time.time() - start_time > timeout:
-                    logger.warning("VisionServer _designate_track_loop timeout session=%s", self._current_session_id)
+                    logger.warning(
+                        f"VisionServer _designate_track_loop timeout session={self._current_session_id}"
+                    )
                     hl.hide_sync()
                     return "timeout"
 
                 # ── 检查 ESC ─────────────────────────────────────────────
                 if event_core.is_cancel():
-                    logger.info("VisionServer _designate_track_loop cancel session=%s", self._current_session_id)
+                    logger.info(f"VisionServer _designate_track_loop cancel session={self._current_session_id}")
                     hl.hide_sync()
                     return "cancel"
 
@@ -489,11 +478,8 @@ class VisionServer:
                     cx, cy = pyautogui.position()
                     hit_box = self._get_minbox(cx, cy, bboxes)
                     logger.info(
-                        "VisionServer _designate_track_loop click session=%s mouse=(%s,%s) hit=%s",
-                        self._current_session_id,
-                        cx,
-                        cy,
-                        hit_box,
+                        f"VisionServer _designate_track_loop click session={self._current_session_id} "
+                        f"mouse=({cx},{cy}) hit={hit_box}"
                     )
                     if hit_box is not None:
                         bx, by, bw, bh = hit_box
@@ -511,9 +497,7 @@ class VisionServer:
                     if fb_type == VisionHlFeedback.CONFIRM.value:
                         boxes = feedback.get("data", {}).get("Boxes", [])
                         logger.info(
-                            "VisionServer _designate_track_loop confirm session=%s boxes=%s",
-                            self._current_session_id,
-                            boxes,
+                            f"VisionServer _designate_track_loop confirm session={self._current_session_id} boxes={boxes}"
                         )
                         data = boxes[0] if isinstance(boxes, list) and boxes else boxes
                         try:
@@ -524,10 +508,12 @@ class VisionServer:
                                 data["Bottom"],
                             )
                         except KeyError:
-                            logger.error("VisionServer: CONFIRM data 缺少 rect 字段: %s", data)
+                            logger.error(f"VisionServer: CONFIRM data 缺少 rect 字段: {data}")
                             return None
                     elif fb_type == VisionHlFeedback.CONTINUE.value:
-                        logger.info("VisionServer _designate_track_loop continue session=%s", self._current_session_id)
+                        logger.info(
+                            f"VisionServer _designate_track_loop continue session={self._current_session_id}"
+                        )
                         continue
                 except queue.Empty:
                     pass
@@ -541,11 +527,8 @@ class VisionServer:
                     if anchor_rect != last_anchor_rect:
                         last_anchor_rect = anchor_rect
                         logger.info(
-                            "VisionServer _designate_track_loop rect_change session=%s mouse=(%s,%s) rect=%s",
-                            self._current_session_id,
-                            cur_x,
-                            cur_y,
-                            anchor_rect,
+                            f"VisionServer _designate_track_loop rect_change session={self._current_session_id} "
+                            f"mouse=({cur_x},{cur_y}) rect={anchor_rect}"
                         )
                         if anchor_rect is not None:
                             bx, by, bw, bh = anchor_rect
@@ -572,18 +555,37 @@ class VisionServer:
         """验证视觉元素是否仍然存在于屏幕上"""
         import json
         try:
-            logger.info("VisionServer _run_validate begin session=%s", self._current_session_id)
+            logger.info(f"VisionServer _run_validate begin session={self._current_session_id}")
             # data 是原始请求消息，cv 数据在 data["data"] 字段中（JSON 字符串）
             cv_data = data.get("data")
+            logger.info(
+                f"VisionServer _run_validate raw_input session={self._current_session_id} "
+                f"input_type={type(cv_data).__name__} input_preview={str(cv_data)[:500]}"
+            )
             if isinstance(cv_data, str):
                 cv_data = json.loads(cv_data)
+            logger.info(
+                f"VisionServer _run_validate parsed_input session={self._current_session_id} "
+                f"keys={list(cv_data.keys()) if isinstance(cv_data, dict) else type(cv_data).__name__} "
+                f"type={cv_data.get('type') if isinstance(cv_data, dict) else None} "
+                f"pos={cv_data.get('pos') if isinstance(cv_data, dict) else None} "
+                f"sr={cv_data.get('sr') if isinstance(cv_data, dict) else None} "
+                f"has_self_img={bool(cv_data.get('img', {}).get('self')) if isinstance(cv_data, dict) else None} "
+                f"has_parent_img={bool(cv_data.get('img', {}).get('parent')) if isinstance(cv_data, dict) else None}"
+            )
             match_box = PickCore.match_imgs(cv_data)
-            logger.info("VisionServer _run_validate match_result session=%s match_box=%s", self._current_session_id, match_box)
+            logger.info(
+                f"VisionServer _run_validate match_result session={self._current_session_id} "
+                f"match_box={match_box}"
+            )
             if match_box:
                 return self._success("校验成功")
             return self._error("validate_not_found")
         except Exception as e:
-            logger.error("VisionServer validate 失败: %s", e)
+            logger.error(
+                f"VisionServer _run_validate failed session={self._current_session_id} err={e} "
+                f"{traceback.format_exc()}"
+            )
             return self._error("validate_failed")
 
     # ------------------------------------------------------------------
@@ -600,20 +602,26 @@ class VisionServer:
         import json
         hl = self.svc.ws_server.hl
         event_core = self.svc.event_core
-        logger.info("VisionServer _run_designate begin session=%s", self._current_session_id)
+        logger.info(f"VisionServer _run_designate begin session={self._current_session_id}")
         event_core.start()
-        logger.info("VisionServer _run_designate event_core.start done session=%s", self._current_session_id)
+        logger.info(f"VisionServer _run_designate event_core.start done session={self._current_session_id}")
 
         try:
             # data 是原始请求消息，cv 数据在 data["data"] 字段中（JSON 字符串）
             cv_data = data.get("data")
             if isinstance(cv_data, str):
                 cv_data = json.loads(cv_data)
-            logger.info("VisionServer _run_designate parsed_data session=%s has_data=%s", self._current_session_id, bool(cv_data))
+            logger.info(
+                f"VisionServer _run_designate parsed_data session={self._current_session_id} "
+                f"has_data={bool(cv_data)} keys={list(cv_data.keys()) if isinstance(cv_data, dict) else type(cv_data).__name__}"
+            )
 
             # Step 1: 校验目标是否还在
             match_box = PickCore.match_imgs(cv_data)
-            logger.info("VisionServer _run_designate match_result session=%s match_box=%s", self._current_session_id, match_box)
+            logger.info(
+                f"VisionServer _run_designate match_result session={self._current_session_id} "
+                f"match_box={match_box}"
+            )
             if not match_box:
                 return self._error("designate_target_not_found")
 
@@ -625,29 +633,43 @@ class VisionServer:
                 target_rect = Rect(mb[0], mb[1], mb[0] + mb[2], mb[1] + mb[3])
 
             hl.cv_start_sync("designate")
-            logger.info("VisionServer _run_designate cv_start_sent session=%s target_rect=%s", self._current_session_id, target_rect)
+            logger.info(
+                f"VisionServer _run_designate cv_start_sent session={self._current_session_id} "
+                f"target_rect={target_rect}"
+            )
 
             # Step 3: 等待截图
             screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
             if screenshot_data is None:
                 return self._error("timeout")
-            logger.info("VisionServer _run_designate screenshot_feedback session=%s keys=%s", self._current_session_id, list(screenshot_data.keys()) if isinstance(screenshot_data, dict) else type(screenshot_data).__name__)
+            logger.info(
+                f"VisionServer _run_designate screenshot_feedback session={self._current_session_id} "
+                f"keys={list(screenshot_data.keys()) if isinstance(screenshot_data, dict) else type(screenshot_data).__name__}"
+            )
 
             desktop_image = self._decode_screenshot(screenshot_data)
             if desktop_image is None:
                 return self._error("designate_anchor_not_found")
-            logger.info("VisionServer _run_designate screenshot_decoded session=%s size=%sx%s", self._current_session_id, desktop_image.width, desktop_image.height)
+            logger.info(
+                f"VisionServer _run_designate screenshot_decoded session={self._current_session_id} "
+                f"size={desktop_image.width}x{desktop_image.height}"
+            )
 
             # Step 4: 分割界面元素（ALT 模式）
             bboxes, partial_rect = self._detect_alt(desktop_image)
-            logger.info("VisionServer _run_designate detect_done session=%s bbox_count=%s partial_rect=%s", self._current_session_id, len(bboxes) if bboxes else 0, partial_rect)
+            logger.info(
+                f"VisionServer _run_designate detect_done session={self._current_session_id} "
+                f"bbox_count={len(bboxes) if bboxes else 0} partial_rect={partial_rect}"
+            )
 
             # Step 5: 发送统一 designate_pick 消息（target_ready 事件）
             hl.designate_pick_sync(target_rect=target_rect, anchor_rect=None, event="target_ready")
 
             # Step 6: 鼠标追踪，等待用户选取锚点
             result = self._designate_track_loop(hl, bboxes, target_rect)
-            logger.info("VisionServer _run_designate track_result session=%s result=%s", self._current_session_id, result)
+            logger.info(
+                f"VisionServer _run_designate track_result session={self._current_session_id} result={result}"
+            )
             if result == "timeout":
                 hl.hide_sync()
                 return self._error("timeout")
@@ -661,13 +683,16 @@ class VisionServer:
             # result 是 hl CONFIRM 回传的锚点 rect (left, top, right, bottom)，来源可信，直接传入校验
             anchor_rect_ltrb = result
             pick_result = self._check_anchor(anchor_rect_ltrb, desktop_image)
-            logger.info("VisionServer _run_designate check_anchor session=%s anchor_rect=%s has_result=%s", self._current_session_id, anchor_rect_ltrb, bool(pick_result))
+            logger.info(
+                f"VisionServer _run_designate check_anchor session={self._current_session_id} "
+                f"anchor_rect={anchor_rect_ltrb} has_result={bool(pick_result)}"
+            )
             hl.hide_sync()
             if pick_result:
                 return self._success(pick_result)
             return self._error("designate_anchor_not_found")
         finally:
-            logger.info("VisionServer _run_designate finally session=%s", self._current_session_id)
+            logger.info(f"VisionServer _run_designate finally session={self._current_session_id}")
             event_core.close()
 
     # ------------------------------------------------------------------
@@ -691,14 +716,8 @@ class VisionServer:
         except Exception:
             x, y, w, h = 0, 0, screen_w, screen_h
         logger.info(
-            "VisionServer _detect_alt session=%s screen=(%s,%s) partial_rect=(%s,%s,%s,%s)",
-            self._current_session_id,
-            screen_w,
-            screen_h,
-            x,
-            y,
-            w,
-            h,
+            f"VisionServer _detect_alt session={self._current_session_id} "
+            f"screen=({screen_w},{screen_h}) partial_rect=({x},{y},{w},{h})"
         )
 
         partial_rect = (x, y, w, h)
@@ -713,7 +732,9 @@ class VisionServer:
             for box in selected_boxes
         ]
         bboxes = sorted(bboxes, key=lambda b: b[2] * b[3])
-        logger.info("VisionServer _detect_alt selected session=%s bbox_count=%s", self._current_session_id, len(bboxes))
+        logger.info(
+            f"VisionServer _detect_alt selected session={self._current_session_id} bbox_count={len(bboxes)}"
+        )
         return bboxes, partial_rect
 
     @staticmethod
@@ -790,87 +811,83 @@ class VisionServer:
         """
         deadline = time.time() + timeout_sec
         event_core = self.svc.event_core
-        logger.info("VisionServer _wait_ctrl_confirm begin session=%s timeout=%s queue=%s", self._current_session_id, timeout_sec, self._queue_size())
+        logger.info(
+            f"VisionServer _wait_ctrl_confirm begin session={self._current_session_id} "
+            f"timeout={timeout_sec} queue={self._queue_size()}"
+        )
         while time.time() < deadline:
             if event_core.is_cancel():
-                logger.info("VisionServer _wait_ctrl_confirm cancel session=%s", self._current_session_id)
+                logger.info(f"VisionServer _wait_ctrl_confirm cancel session={self._current_session_id}")
                 return "cancel"
             # 检查 hl feedback
             try:
                 feedback = self._hl_feedback_queue.get(timeout=0.05)
                 fb_type = feedback.get("feedback_type")
                 logger.info(
-                    "VisionServer _wait_ctrl_confirm dequeued session=%s fb_type=%s queue_after_get=%s payload=%s",
-                    self._current_session_id,
-                    fb_type,
-                    self._queue_size(),
-                    feedback,
+                    f"VisionServer _wait_ctrl_confirm dequeued session={self._current_session_id} "
+                    f"fb_type={fb_type} queue_after_get={self._queue_size()} payload={feedback}"
                 )
                 if fb_type == VisionHlFeedback.CONFIRM.value:
                     boxes = feedback.get("data", {}).get("Boxes", [])
                     logger.info(
-                        "VisionServer _wait_ctrl_confirm confirm session=%s boxes=%s",
-                        self._current_session_id,
-                        boxes,
+                        f"VisionServer _wait_ctrl_confirm confirm session={self._current_session_id} boxes={boxes}"
                     )
                     if boxes:
-                        logger.info("VisionServer _wait_ctrl_confirm return session=%s boxes=%s", self._current_session_id, boxes)
+                        logger.info(
+                            f"VisionServer _wait_ctrl_confirm return session={self._current_session_id} boxes={boxes}"
+                        )
                         return boxes  # 直接返回 Boxes 列表
-                    logger.warning("VisionServer _wait_ctrl_confirm empty_boxes session=%s", self._current_session_id)
+                    logger.warning(
+                        f"VisionServer _wait_ctrl_confirm empty_boxes session={self._current_session_id}"
+                    )
                     return "cancel"
                 # 非预期类型放回
                 self._hl_feedback_queue.put(feedback)
                 logger.info(
-                    "VisionServer _wait_ctrl_confirm requeue session=%s fb_type=%s queue_after_put=%s",
-                    self._current_session_id,
-                    fb_type,
-                    self._queue_size(),
+                    f"VisionServer _wait_ctrl_confirm requeue session={self._current_session_id} "
+                    f"fb_type={fb_type} queue_after_put={self._queue_size()}"
                 )
             except queue.Empty:
                 pass
 
-        logger.warning("VisionServer _wait_ctrl_confirm timeout session=%s queue=%s", self._current_session_id, self._queue_size())
+        logger.warning(
+            f"VisionServer _wait_ctrl_confirm timeout session={self._current_session_id} queue={self._queue_size()}"
+        )
         return "timeout"
 
     def _wait_feedback(self, expected_type: VisionHlFeedback, timeout_sec: float = 10) -> dict | None:
         """阻塞等待指定类型的 hl feedback，超时返回 None"""
         deadline = time.time() + timeout_sec
         logger.info(
-            "VisionServer _wait_feedback begin session=%s expected=%s timeout=%s queue=%s",
-            self._current_session_id,
-            expected_type.value,
-            timeout_sec,
-            self._queue_size(),
+            f"VisionServer _wait_feedback begin session={self._current_session_id} "
+            f"expected={expected_type.value} timeout={timeout_sec} queue={self._queue_size()}"
         )
         while time.time() < deadline:
             try:
                 feedback = self._hl_feedback_queue.get(timeout=0.1)
                 logger.info(
-                    "VisionServer _wait_feedback dequeued session=%s expected=%s actual=%s queue_after_get=%s",
-                    self._current_session_id,
-                    expected_type.value,
-                    feedback.get("feedback_type"),
-                    self._queue_size(),
+                    f"VisionServer _wait_feedback dequeued session={self._current_session_id} "
+                    f"expected={expected_type.value} actual={feedback.get('feedback_type')} "
+                    f"queue_after_get={self._queue_size()}"
                 )
                 if feedback.get("feedback_type") == expected_type.value:
-                    logger.info("VisionServer _wait_feedback matched session=%s expected=%s", self._current_session_id, expected_type.value)
+                    logger.info(
+                        f"VisionServer _wait_feedback matched session={self._current_session_id} "
+                        f"expected={expected_type.value}"
+                    )
                     return feedback.get("data", {})
                 # 非预期类型放回队列
                 self._hl_feedback_queue.put(feedback)
                 logger.info(
-                    "VisionServer _wait_feedback requeue session=%s expected=%s actual=%s queue_after_put=%s",
-                    self._current_session_id,
-                    expected_type.value,
-                    feedback.get("feedback_type"),
-                    self._queue_size(),
+                    f"VisionServer _wait_feedback requeue session={self._current_session_id} "
+                    f"expected={expected_type.value} actual={feedback.get('feedback_type')} "
+                    f"queue_after_put={self._queue_size()}"
                 )
             except queue.Empty:
                 pass
         logger.warning(
-            "VisionServer _wait_feedback timeout session=%s expected=%s queue=%s",
-            self._current_session_id,
-            expected_type.value,
-            self._queue_size(),
+            f"VisionServer _wait_feedback timeout session={self._current_session_id} "
+            f"expected={expected_type.value} queue={self._queue_size()}"
         )
         return None
 
@@ -879,6 +896,7 @@ class VisionServer:
         """从 hl feedback data 中解码截图为 PIL Image"""
         import base64
         import io
+        import re
         from PIL import Image
 
         b64 = screenshot_data.get("image") if isinstance(screenshot_data, dict) else None
@@ -886,16 +904,23 @@ class VisionServer:
             logger.warning("VisionServer: 截图数据为空")
             return None
         try:
+            if "," in b64 and "base64" in b64[:64]:
+                b64 = b64.split(",", 1)[1]
+            b64 = re.sub(r"\s+", "", b64)
+            missing_padding = len(b64) % 4
+            if missing_padding:
+                b64 += "=" * (4 - missing_padding)
             img_bytes = base64.b64decode(b64)
             image = Image.open(io.BytesIO(img_bytes))
             logger.info(
-                "VisionServer _decode_screenshot success bytes=%s size=%sx%s mode=%s",
-                len(img_bytes),
-                getattr(image, "width", None),
-                getattr(image, "height", None),
-                getattr(image, "mode", None),
+                f"VisionServer _decode_screenshot success bytes={len(img_bytes)} "
+                f"size={getattr(image, 'width', None)}x{getattr(image, 'height', None)} "
+                f"mode={getattr(image, 'mode', None)}"
             )
             return image
         except Exception as e:
-            logger.error("VisionServer: 截图解码失败: %s", e)
+            logger.error(
+                f"VisionServer: 截图解码失败: {e} "
+                f"raw_prefix={str(screenshot_data)[:200]}"
+            )
             return None

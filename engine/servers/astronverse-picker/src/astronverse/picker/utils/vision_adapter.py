@@ -2,11 +2,12 @@ import base64
 import io
 
 import pyautogui
+import numpy as np
 from PIL import Image
 
 from astronverse.vision.core import CvCore
 from astronverse.vision.cv_match import AnchorMatch
-from astronverse.vision.cv_picker import ImageDetector
+from astronverse.vision.cv_picker import ImageDetector as VisionImageDetector
 
 
 class RectHandler:
@@ -14,6 +15,19 @@ class RectHandler:
     def get_foreground_window_rect():
         width, height = pyautogui.size()
         return None, "Unknown", (0, 0, width, height)
+
+
+class ImageDetector(VisionImageDetector):
+    def __init__(self, img=None):
+        if img is None:
+            super().__init__()
+            return
+
+        if isinstance(img, Image.Image):
+            img = cv_pil_to_bgr(img)
+
+        super().__init__()
+        self.get_image_from_gradio(img)
 
 
 class PickCore:
@@ -77,3 +91,15 @@ class PickCore:
     def match_imgs(data, canny_flag=False):
         return CvCore.match_imgs({"elementData": data}, canny_flag=canny_flag)
 
+
+def cv_pil_to_bgr(img: Image.Image):
+    img_np = np.array(img)
+    if img_np.ndim == 2:
+        return img_np
+    if img_np.shape[2] == 4:
+        import cv2
+
+        return cv2.cvtColor(img_np, cv2.COLOR_RGBA2BGR)
+    import cv2
+
+    return cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
