@@ -5,6 +5,7 @@ export enum PickMode {
   NORMAL = 'normal',
   SMART = 'smart',
   VISION = 'vision',
+  VISION_PICK = 'vision_pick', // 拾取中
   DESIGNATE = 'designate_pick', // CV 模式的分割，用于区分普通CV拾取和指定区域拾取
   WINDOW = 'window',
   ELEMENT = "element",
@@ -70,4 +71,32 @@ export const TipPosition = {
     bottom: '60px',
     right: '10px',
   }
+}
+
+
+export interface HighlightRect {
+  x: number
+  y: number
+  width: number
+  height: number
+  tag?: string
+}
+
+export interface DrawRect {
+  Left: number
+  Top: number
+  Right: number
+  Bottom: number
+  Msg?: string
+}
+
+export interface MessageType {
+  MouseX?: number
+  MouseY?: number
+  Boxes?: DrawRect[],
+  Type?: PickMode,
+  Operation: string,
+  ShortcutKey?: ShortCutKey,
+  Language?: string,
+  TargetRect?: DrawRect,
 }

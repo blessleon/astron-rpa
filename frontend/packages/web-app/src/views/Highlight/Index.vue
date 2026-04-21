@@ -3,12 +3,9 @@
 <script lang="ts" setup>
 // import ConfigProvider from '@/components/ConfigProvider/index.vue'
 import { useHighlight } from './hooks/useHighlight'
-import { useCV } from './hooks/useCV'
 import CV from './CV.vue'
 import { PickMode } from './config'
 import { currentLocale, t } from './locale'
-
-const { targetRect, confirmCvCtrlPick, confirmCvAltPick, sendScreenshot, reCvAltPick, handleMessage: handleCvMessage } = useCV()
 
 const {
   mousePos,
@@ -20,6 +17,14 @@ const {
   cvCropShow,
   pickStep,
   highlightRects,
+  targetRect,
+  targetRectShow,
+  targetButton,
+  confirmCvCtrlPick,
+  confirmCvAltPick,
+  sendScreenshot,
+  reCvAltPick,
+  captureDone,
 } = useHighlight()
 
 </script>
@@ -45,11 +50,16 @@ const {
         v-if="cvCropShow"
         :cvStep="pickStep"
         :targetRect="targetRect"
+        :targetRectShow="targetRectShow"
+        :targetButton="targetButton"
+        :pickMode="pickMode"
         @save="confirmCvCtrlPick"
         @confirm-alt="confirmCvAltPick"
         @send-screenshot="sendScreenshot"
         @reselect-alt="reCvAltPick"
+        @capture-done="captureDone"
       />
+
       <div v-if="tooltipVisible" :class="`tooltip bg-bg-elevated ${tooltipPos === 'leftTop' ? 'tooltip-left-top' : 'tooltip-right-bottom'}`">
         <div class="tooltip-item font-bold" v-for="(sc, i) in shortcuts" :key="i">
           <span :class="`short-title ${currentLocale === 'en_US' ? 'short-title-en':''}`" >{{ sc.title }}</span>

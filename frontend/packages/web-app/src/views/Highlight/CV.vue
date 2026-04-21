@@ -3,16 +3,18 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue'
 import { windowManager, utilsManager } from '@/platform'
-import { DrawRect } from './types.d'
 import { t } from './locale'
-import { PickStep } from './config';
+import { PickStep, PickMode, HighlightRect } from './config';
 
 const props = defineProps<{
   cvStep: string
-  targetRect?: DrawRect | null
+  targetRect?: HighlightRect | null
+  targetRectShow?: boolean
+  targetButton?: boolean
+  pickMode?: string
 }>()
 // ─── Emits ───────────────────────────────────────────────────────────────────
-const emit = defineEmits(['save', 'confirmAlt', 'reselectAlt', 'sendScreenshot'])
+const emit = defineEmits(['save', 'confirmAlt', 'reselectAlt', 'sendScreenshot', 'captureDone'])
 
 // ─── Screenshot state ────────────────────────────────────────────────────────
 const screenshotDataUrl = ref<string>('')
@@ -35,12 +37,7 @@ const hasAltSelection = computed(() => isCvAltMode.value && !!props.targetRect)
 const selection = computed(() => {
   // PickStep.ALT 模式：使用后端返回的 targetRect
   if (isCvAltMode.value && props.targetRect) {
-    return {
-      x: props.targetRect.Left / dpr,
-      y: props.targetRect.Top / dpr,
-      width: (props.targetRect.Right - props.targetRect.Left) / dpr,
-      height: (props.targetRect.Bottom - props.targetRect.Top) / dpr,
-    }
+    return props.targetRect
   }
 
   // cv_ctrl 模式：使用用户手动选择的区域
@@ -175,13 +172,12 @@ function saveSelection() {
       imageDataUrl,
       position: { x: sel.x, y: sel.y, width: sel.width, height: sel.height },
     })
-    console.log('Selected area:', sel)
   }
 }
 
 // PickStep.ALT 模式的操作
 function confirmAltSelection() {
-  emit('confirmAlt')
+  emit('confirmAlt', props.targetRect)
 }
 
 function reselectAlt() {
@@ -196,10 +192,13 @@ onMounted(async () => {
     if (dataUrl) {
       screenshotDataUrl.value = dataUrl as string
     }
+    emit('captureDone')
     if (props.cvStep === PickStep.ALT) {
       // PickStep.ALT 模式下直接显示后端分析的选区，不允许手动选择
       hasSelection.value = false
-      emit('sendScreenshot', screenshotDataUrl.value)
+      if (props.pickMode !== PickMode.DESIGNATE) {
+        emit('sendScreenshot', screenshotDataUrl.value)
+      }
     }
   }
   catch (err) {
@@ -218,8 +217,17 @@ onMounted(async () => {
     <img v-if="screenshotDataUrl" class="cv-screenshot" :src="screenshotDataUrl" draggable="false" alt="" />
 
     <div v-if="isCvAltMode">
+      <div
+        v-if="targetRectShow"
+        class="highlight-box target-rect-highlight"
+        :style="{
+          transform: `translate(${targetRect!.x}px, ${targetRect!.y}px)`,
+          width: targetRect!.width + 'px',
+          height: targetRect!.height + 'px',
+        }"
+      />
       <!-- PickStep.ALT 模式：保存 / 重新选择 -->
-      <div v-if="hasAltSelection" class="cv-action-bar" :style="actionBarStyle">
+      <div v-if="targetButton" class="cv-action-bar" :style="actionBarStyle">
         <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="reselectAlt">{{ t('reselect') }}</button>
         <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="confirmAltSelection">{{ t('save') }}</button>
       </div>
@@ -245,12 +253,12 @@ onMounted(async () => {
         <span class="cv-corner cv-corner--br" />
       </div>
       <!-- cv_ctrl 模式：取消 / 保存 -->
-      <div v-else-if="hasSelection && !isSelecting" class="cv-action-bar" :style="actionBarStyle">
+      <div v-if="hasSelection && !isSelecting" class="cv-action-bar" :style="actionBarStyle">
         <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="cancelSelection">{{ t('cancel') }}</button>
         <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="saveSelection">{{ t('save') }}</button>
       </div>
       <!-- 提示信息 -->
-      <div v-else-if="!hasSelection && !isSelecting && !isCvAltMode" class="cv-tip">{{ t('dragToSelect') }}</div>
+      <div v-else-if="!hasSelection && !isSelecting" class="cv-tip">{{ t('dragToSelect') }}</div>
     </div>
   </div>
 </template>

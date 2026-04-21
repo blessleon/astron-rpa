@@ -1,14 +1,13 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { windowManager } from '@/platform'
-import { PickShortCuts, PickMode, PickStep, ShortCutKey } from '../config'
+import { PickShortCuts, PickMode, PickStep, ShortCutKey, HighlightRect, MessageType, DrawRect } from '../config'
 import { RpaHighlight } from '@/api/highlight'
 import { message } from 'ant-design-vue'
-import type { HighlightRect, MessageType } from '../types.d'
 import { currentLocale, t } from '../locale'
 
+type CvPickEvent = 'target_ready' | 'mouse_move' | 'click_confirm' | ''
 
-
-export function useHighlight(cvMessageHandler?: (data: any) => void) {
+export function useHighlight() {
   const highlightBox = ref<HTMLDivElement | null>(null)
   const dpr = window.devicePixelRatio || 1
   const highlightRects = ref([] as HighlightRect[])
@@ -18,6 +17,13 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
   const appName = ref('')
   const tooltipVisible = ref(false)
   let tooltipLastPos = 'leftTop'
+  let canDraw = true
+
+  // CV state
+  const targetRect = ref<HighlightRect | null>(null)
+  const targetButton = ref(false)
+  const anchorRect = ref<HighlightRect | null>(null)
+  const cvPickEvent = ref<CvPickEvent>('')
 
   // tooltip位置根据鼠标位置动态调整，避免遮挡
   const tooltipPos = computed(() => {
@@ -50,31 +56,136 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
   })
   // CV模式下的截图预览是否显示
   const cvCropShow = computed(() => {
+    if (pickMode.value === PickMode.DESIGNATE && pickStep.value === PickStep.ALT) return true
     return [PickStep.CTRL, PickStep.ALT].includes(pickStep.value) && pickMode.value === PickMode.VISION
   })
+  // targetRect 高亮是否显示（DESIGNATE 模式下，非 ALT 步骤时显示）
+  const targetRectShow = computed(() => {
+    return !!targetRect.value
+  })
+
+  // CV computed
+  const toRectStyle = (rect: HighlightRect | null) => {
+    if (!rect) return null
+    return {
+      left: `${rect.x}px`,
+      top: `${rect.y}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+    }
+  }
+  const targetStyle = computed(() => toRectStyle(targetRect.value))
+  const anchorStyle = computed(() => toRectStyle(anchorRect.value))
+  const hasAnchor = computed(() => !!anchorRect.value)
+
   // 设置拾取步骤（仅CV模式）
   const setPickStep = (step: PickStep) => {
     pickStep.value = step
   }
   // 隐藏所有高亮和提示
   const hideAll = () => {
+    canDraw = true
     tooltipVisible.value = false
     highlightRects.value = []
     setPickStep(PickStep.DEFAULT)
   }
+
+  // CV reset
+  const resetCV = () => {
+    targetRect.value = null
+    anchorRect.value = null
+    cvPickEvent.value = ''
+    canDraw = true
+  }
+
+  // CV feedback
+  const sendFeedback = (feedbackType: string, data?: any) => {
+    console.log('feedbackType: ', feedbackType, data);
+    const payload: any = { feedback_type: feedbackType }
+    if (data !== undefined) payload.data = data
+    RpaHighlight.send(payload)
+  }
+
+  const confirmAnchor = () => {
+    if (!anchorRect.value) return
+    sendFeedback('confirm', { Boxes: [anchorRect.value] })
+    resetCV()
+  }
+
+  const stopPicking = () => {
+    sendFeedback('stop')
+    resetCV()
+  }
+
+  const continuePicking = () => {
+    sendFeedback('continue')
+    resetCV()
+  }
+
+  const sendScreenshot = (imageBase64: string) => {
+    console.log('sendScreenshot: ', imageBase64)
+    sendFeedback('screenshot', { image: imageBase64 })
+  }
+
+  const confirmCvAltPick = (params) => {
+    const pos =  {
+      Left: Math.floor(params.x * dpr),
+      Top: Math.floor(params.y * dpr),
+      Right: Math.floor((params.x + params.width) * dpr),
+      Bottom: Math.floor((params.y + params.height) * dpr),
+    }
+    sendFeedback('confirm', { Boxes: [pos] })
+    resetCV()
+  }
+
+  const confirmCvCtrlPick = (params: { imageDataUrl: string, position: HighlightRect }) => {
+    const data = params.position
+    const pos = {
+      Left: Math.floor(data.x * dpr),
+      Top: Math.floor(data.y * dpr),
+      Right: Math.floor((data.x + data.width) * dpr),
+      Bottom: Math.floor((data.y + data.height) * dpr),
+    }
+    sendFeedback('confirm', { Boxes: [pos] })
+  }
+
+  const reCvAltPick = () => {
+    console.log('reCvAltPick: ');
+    sendFeedback('continue')
+    setPickStep(PickStep.ALT)
+    canDraw = true
+  }
+
+  const captureDone = () => {
+    tooltipVisible.value = true
+  }
+
   // 处理快捷键，CV模式下Ctrl/Alt切换截图/智能识别，Shift返回上一步
   const handleShortcutKey = (key: ShortCutKey) => {
     key = key?.toLowerCase() as ShortCutKey
     if (key === ShortCutKey.CTRL && pickMode.value === PickMode.VISION) {
       setPickStep(PickStep.CTRL)
+      tooltipVisible.value = false
       windowManager.setMouseIgnore(false)
     }
     if (key === ShortCutKey.ALT && pickMode.value === PickMode.VISION) {
       setPickStep(PickStep.ALT)
+      tooltipVisible.value = false
       windowManager.setMouseIgnore(false)
     }
     if (key === ShortCutKey.SHIFT && pickMode.value === PickMode.VISION) {
       setPickStep(PickStep.DEFAULT)
+      targetButton.value = false
+      targetRect.value = null
+    }
+  }
+  const handleRect = (data: DrawRect) => {
+    return {
+      x: data.Left / dpr,
+      y: data.Top / dpr,
+      width: (data.Right - data.Left) / dpr,
+      height: (data.Bottom - data.Top) / dpr,
+      tag: data.Msg,
     }
   }
   // 处理高亮
@@ -83,13 +194,7 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
       x: data.MouseX,
       y: data.MouseY,
     }
-    highlightRects.value = data.Boxes.map(box => ({
-      x: box.Left / dpr,
-      y: box.Top / dpr,
-      width: (box.Right - box.Left) / dpr,
-      height: (box.Bottom - box.Top) / dpr,
-      tag: box.Msg,
-    }))
+    highlightRects.value = data.Boxes.map(box => handleRect(box))
   }
   // 处理消息
   const handleOperation = (op: string, data: MessageType) => {
@@ -101,7 +206,6 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
         if (data.Type) pickMode.value = data.Type
         if (data.Language) currentLocale.value = data.Language as any
         tooltipVisible.value = data.Type !== PickMode.VALIDATE
-        console.log('tooltipVisible.value: ', tooltipVisible.value);
         if (pickMode.value !== PickMode.VISION) {
           windowManager.setMouseIgnore(true)
         }
@@ -113,7 +217,22 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
         break
       case 'draw':
         console.log('handleOperation: ', op, data);
-        handleDraw(data)
+        if (data.Type === PickMode.DESIGNATE) {
+          targetRect.value = handleRect(data.TargetRect)
+          targetButton.value = true
+          canDraw = false
+          return
+        }
+        if (canDraw) {
+          if (data.Type === PickMode.VISION_PICK) {
+            targetButton.value = false
+            targetRect.value = data.Boxes?.[0] ? handleRect(data.Boxes[0]) : null
+            return
+          }
+          if (canDraw) {
+            handleDraw(data)
+          }
+        }
         windowManager.setWindowAlwaysOnTop(true)
         break
       case 'mouse_move':
@@ -129,11 +248,6 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
     const shortcut = data.ShortcutKey
     handleShortcutKey(shortcut)
     handleOperation(op, data)
-
-    // 如果是 CV 模式，同时传递给 CV 消息处理器
-    // if (pickMode.value === PickMode.CV && cvMessageHandler) {
-    //   cvMessageHandler(data)
-    // }
   }
 
   onMounted(() => {
@@ -167,5 +281,23 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
     cvCropShow,
     pickStep,
     setPickStep,
+    // CV
+    targetRect,
+    targetRectShow,
+    targetButton,
+    anchorRect,
+    cvPickEvent,
+    targetStyle,
+    anchorStyle,
+    hasAnchor,
+    confirmAnchor,
+    stopPicking,
+    continuePicking,
+    sendScreenshot,
+    confirmCvAltPick,
+    reCvAltPick,
+    confirmCvCtrlPick,
+    resetCV,
+    captureDone,
   }
 }
