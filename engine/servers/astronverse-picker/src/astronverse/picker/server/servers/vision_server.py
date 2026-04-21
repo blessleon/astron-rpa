@@ -97,6 +97,7 @@ class VisionServer:
     def _run_start(self) -> str | None:
         hl = self.svc.ws_server.hl
         hl.start_sync("vision")
+        logger.info("VisionServer: START 状态机启动")
 
         current_keys: set = set()
         key_event: dict = {"mode": None}
@@ -119,12 +120,16 @@ class VisionServer:
             with key_lock:
                 if key == keyboard.Key.esc:
                     key_event["mode"] = "esc"
+                    logger.info("VisionServer: esc 状态机启动")
                 elif key in (keyboard.Key.alt_l, keyboard.Key.alt_gr) and len(current_keys) == 1:
                     key_event["mode"] = "alt"
+                    logger.info("VisionServer: alt 状态机启动")
                 elif key in (keyboard.Key.ctrl_l, keyboard.Key.ctrl_r) and len(current_keys) == 1:
                     key_event["mode"] = "ctrl"
+                    logger.info("VisionServer: ctrl 状态机启动")
                 elif key in (keyboard.Key.shift_l, keyboard.Key.shift_r) and len(current_keys) == 1:
                     key_event["mode"] = "shift"
+                    logger.info("VisionServer: shift 状态机启动")
 
         def on_release(key):
             current_keys.discard(key)
@@ -155,6 +160,7 @@ class VisionServer:
 
                 if mode == "alt":
                     hl.cv_shortcutkey_sync("alt")
+                    logger.info("alt VisionServer: 等待截图")
                     screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
                     if screenshot_data is None:
                         logger.warning("VisionServer: 截图超时，重新等待")
@@ -180,7 +186,11 @@ class VisionServer:
 
                 elif mode == "ctrl":
                     hl.cv_shortcutkey_sync("ctrl")
-                    screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
+                    logger.info("ctrl VisionServer: 等待截图")
+                    # screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
+                    # if screenshot_data is None:
+                    #     logger.warning("VisionServer: 截图超时，重新等待")
+                    #     continue
                     confirm_result = self._wait_ctrl_confirm(key_event, key_lock)
                     if confirm_result == "cancel":
                         hl.hide_sync()
