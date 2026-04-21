@@ -9,11 +9,9 @@ import HeaderControl from '@/components/HeaderControl/HeaderControl.vue'
 import { useProcessStore } from '@/stores/useProcessStore'
 import { useRunlogStore } from '@/stores/useRunlogStore'
 import { useRunningStore } from '@/stores/useRunningStore'
-import { useCreateWindow } from './hook/useCreateWindow'
 
 const processStore = useProcessStore()
 const runningStore = useRunningStore()
-const { openHighlightWindow, closeHighlightWindow } = useCreateWindow()
 const route = useRoute()
 
 async function initByRoute() {
@@ -47,7 +45,6 @@ onMounted(async () => {
   runningStore.fetchDataTable()
   await startPickServices({})
   isStart = true
-  openHighlightWindow()
 })
 
 onUnmounted(async () => {
@@ -55,7 +52,6 @@ onUnmounted(async () => {
     return
   await stopPickServices({})
   isStart = false
-  closeHighlightWindow()
 })
 
 onBeforeUnmount(() => {

@@ -18,9 +18,8 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
   const appName = ref('')
   const tooltipVisible = ref(false)
   let tooltipLastPos = 'leftTop'
-  let rafId: number | null = null
-  let pendingDrawData: MessageType | null = null
 
+  // tooltip位置根据鼠标位置动态调整，避免遮挡
   const tooltipPos = computed(() => {
     const margin = 300
     const mouse = mousePos.value
@@ -32,46 +31,38 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
     }
     return tooltipLastPos
   })
-
+  // 标签位置根据高亮区域位置动态调整，避免标签被遮挡
   const tagPosition = computed(() => {
     const rect = highlightRects.value[0]
     return rect && rect.y < 60 ? 'bottom' : 'top'
   })
-
+  // 快捷键提示根据拾取模式动态调整
   const shortcuts = computed(() => {
     const pickKey = pickMode.value === PickMode.CV ? (pickMode.value + pickStep.value) as PickMode : pickMode.value
-    console.log('pickKey: ', pickKey);
     const shortCuts = PickShortCuts.value[pickKey]
     console.log('shortCuts: ', shortCuts);
     return PickShortCuts.value[pickKey] || []
   })
-
+  // 高亮区域是否显示（CV模式下由CV组件控制）
   const highlightShow = computed(() => {
     const rect = highlightRects.value[0]
     return rect && rect.width > 0 && rect.height > 0 && pickMode.value !== PickMode.CV
   })
-
+  // CV模式下的截图预览是否显示
   const cvCropShow = computed(() => {
     return pickStep.value === PickStep.CV_CTRL || pickStep.value === PickStep.CV_ALT
   })
-
+  // 设置拾取步骤（仅CV模式）
   const setPickStep = (step: PickStep) => {
     pickStep.value = step
   }
+  // 隐藏所有高亮和提示
   const hideAll = () => {
     tooltipVisible.value = false
     highlightRects.value = []
-    highlightBox.value && (highlightBox.value.innerHTML = '')
     setPickStep(PickStep.DEFAULT)
-    window.location.reload()
   }
-  onUnmounted(() => {
-    if (rafId !== null) {
-      cancelAnimationFrame(rafId)
-      rafId = null
-    }
-  })
-
+  // 处理快捷键，CV模式下Ctrl/Alt切换截图/智能识别，Shift返回上一步
   const handleShortcutKey = (key: ShortCutKey) => {
     key = key?.toLowerCase() as ShortCutKey
     if (key === ShortCutKey.CTRL && pickMode.value === PickMode.CV) {
@@ -86,111 +77,38 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
       setPickStep(PickStep.DEFAULT)
     }
   }
-
-  const renderFrame = () => {
-    rafId = null
-    if (!pendingDrawData) return
-
-    const data = pendingDrawData
-    pendingDrawData = null
-
-    const boxes = data.Boxes
-    if (!boxes || boxes.length === 0) return
-
-    const container = highlightBox.value
-    if (!container) return
-
-    const isValidateMode = pickMode.value === PickMode.VALIDATE
-    const firstBox = boxes[0]
-    const tagPos = firstBox && (firstBox.Top < 60) ? 'bottom' : 'top'
-
-    if (isValidateMode) {
-      container.innerHTML = ''
-      const fragment = document.createDocumentFragment()
-      boxes.forEach((box: any) => {
-        const div = document.createElement('div')
-        div.className = 'highlight-box highlight-box-validate'
-        const x = box.Left / dpr
-        const y = box.Top / dpr
-        const width = (box.Right - box.Left) / dpr
-        const height = (box.Bottom - box.Top) / dpr
-        div.style.cssText = `transform:translate(${x}px,${y}px);width:${width}px;height:${height}px`
-        if (box.Msg) {
-          const span = document.createElement('span')
-          span.className = tagPos === 'top' ? 'highlight-tag highlight-tag-top' : 'highlight-tag highlight-tag-bottom'
-          span.textContent = box.Msg
-          div.appendChild(span)
-        }
-        fragment.appendChild(div)
-      })
-      container.appendChild(fragment)
-      return
-    }
-
-    // non-validate modes always have a single box — reuse existing element
-    const box = firstBox
-    const x = box.Left / dpr
-    const y = box.Top / dpr
-    const width = (box.Right - box.Left) / dpr
-    const height = (box.Bottom - box.Top) / dpr
-    const cssText = `transform:translate(${x}px,${y}px);width:${width}px;height:${height}px`
-
-    let div = container.firstElementChild as HTMLDivElement | null
-    if (!div) {
-      div = document.createElement('div')
-      div.className = 'highlight-box'
-      container.appendChild(div)
-    }
-    div.style.cssText = cssText
-
-    if (box.Msg) {
-      let span = div.firstElementChild as HTMLSpanElement | null
-      if (!span) {
-        span = document.createElement('span')
-        div.appendChild(span)
-      }
-      span.className = tagPos === 'top' ? 'highlight-tag highlight-tag-top' : 'highlight-tag highlight-tag-bottom'
-      span.textContent = box.Msg
-    } else {
-      const span = div.firstElementChild
-      if (span) div.removeChild(span)
-    }
-  }
-
+  // 处理高亮
   const handleDraw = (data: MessageType) => {
     mousePos.value = {
       x: data.MouseX,
       y: data.MouseY,
     }
     highlightRects.value = data.Boxes.map(box => ({
-      x: box.Left,
-      y: box.Top,
-      width: box.Right - box.Left,
-      height: box.Bottom - box.Top,
+      x: box.Left / dpr,
+      y: box.Top / dpr,
+      width: (box.Right - box.Left) / dpr,
+      height: (box.Bottom - box.Top) / dpr,
       tag: box.Msg,
     }))
-    pendingDrawData = data
-    if (rafId === null) {
-      rafId = requestAnimationFrame(renderFrame)
-    }
   }
-
+  // 处理消息
   const handleOperation = (op: string, data: MessageType) => {
+    console.log('handleOperation: ', op, data);
     switch (op) {
       case 'start':
         windowManager.showWindow()
+        windowManager.setWindowAlwaysOnTop(true)
         if (data.Type) pickMode.value = data.Type
-        // if (data.Language) currentLocale.value = data.Language as any
-        console.log('start: ', data);
+        if (data.Language) currentLocale.value = data.Language as any
         tooltipVisible.value = data.Type !== PickMode.VALIDATE
         break
       case 'hide':
-        console.log('hide: ', data);
         highlightRects.value = []
         hideAll()
         break
       case 'draw':
         handleDraw(data)
+        windowManager.setWindowAlwaysOnTop(true)
         break
       case 'mouse_move':
         mousePos.value = { x: data.MouseX, y: data.MouseY }
@@ -199,9 +117,8 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
         break
     }
   }
-
+  // 处理websocket消息
   const handleMessage = (data: MessageType) => {
-    // console.log('bindMessage data: ', data);
     const op = data.Operation
     const shortcut = data.ShortcutKey
     handleShortcutKey(shortcut)
@@ -211,15 +128,12 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
     if (pickMode.value === PickMode.CV && cvMessageHandler) {
       cvMessageHandler(data)
     }
-
-    windowManager.setWindowAlwaysOnTop(true)
   }
 
   onMounted(() => {
     const pickModeFromUrl = new URLSearchParams(window.location.search).get('pickMode') as PickMode
     if (pickModeFromUrl) {
-      pickMode.value = pickModeFromUrl
-      if (pickMode.value === PickMode.CV) {
+      if (pickModeFromUrl === PickMode.CV) {
         windowManager.setMouseIgnore(false)
       } else {
         windowManager.setMouseIgnore(true)
