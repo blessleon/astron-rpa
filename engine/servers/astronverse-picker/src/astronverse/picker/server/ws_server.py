@@ -153,7 +153,13 @@ class WsServer:
         WsServer.loop = loop
 
         async def _start():
-            srv = await websockets.serve(self.websocket_endpoint, "127.0.0.1", self.port)
+            # ALT 模式会通过 hl 通道回传 base64 截图，需放宽单消息大小限制
+            srv = await websockets.serve(
+                self.websocket_endpoint,
+                "127.0.0.1",
+                self.port,
+                max_size=10 * 1024 * 1024,
+            )
             logger.info("服务已启动 ws://127.0.0.1:%s", self.port)
             await asyncio.Event().wait()  # 永远挂起，等价于 run_forever
             return srv

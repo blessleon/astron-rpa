@@ -1,4 +1,5 @@
 import base64
+import contextlib
 import io
 
 import pyautogui
@@ -28,6 +29,66 @@ class ImageDetector(VisionImageDetector):
 
         super().__init__()
         self.get_image_from_gradio(img)
+
+    @staticmethod
+    def apply_nms(boxes: list[list[int]], iou_threshold: float = 0.3) -> list[list[int]]:
+        """使用 numpy + 相交预筛选优化 NMS，降低全屏场景耗时。"""
+        if not boxes:
+            return []
+
+        boxes_array = np.array(boxes, dtype=np.float32)
+        areas = boxes_array[:, 2] * boxes_array[:, 3]
+        order = np.argsort(boxes_array[:, 2])
+
+        keep_boxes = []
+        suppressed = np.zeros(len(boxes), dtype=bool)
+
+        for idx in range(len(order) - 1, -1, -1):
+            i = order[idx]
+            if suppressed[i]:
+                continue
+
+            keep_boxes.append(boxes[i])
+
+            x1, y1, w1, h1 = boxes_array[i]
+            x1_max, y1_max = x1 + w1, y1 + h1
+            area1 = areas[i]
+
+            for jdx in range(idx):
+                j = order[jdx]
+                if suppressed[j]:
+                    continue
+
+                x2, y2, w2, h2 = boxes_array[j]
+                x2_max, y2_max = x2 + w2, y2 + h2
+
+                if x1_max <= x2 or x2_max <= x1 or y1_max <= y2 or y2_max <= y1:
+                    continue
+
+                inter_x1 = max(x1, x2)
+                inter_y1 = max(y1, y2)
+                inter_x2 = min(x1_max, x2_max)
+                inter_y2 = min(y1_max, y2_max)
+                inter_area = (inter_x2 - inter_x1) * (inter_y2 - inter_y1)
+
+                if inter_area <= 0:
+                    continue
+
+                area2 = areas[j]
+                union_area = area1 + area2 - inter_area
+                iou = inter_area / union_area
+                if iou >= iou_threshold or iou < 0.0003:
+                    suppressed[j] = True
+
+        return keep_boxes
+
+    def detect_objects(self, dash_color, line_width):
+        """
+        复用基类流程，但屏蔽基类内的 print 调试输出，
+        避免全屏大列表输出拖慢处理。
+        """
+        with contextlib.redirect_stdout(io.StringIO()):
+            return super().detect_objects(dash_color, line_width)
 
 
 class PickCore:
