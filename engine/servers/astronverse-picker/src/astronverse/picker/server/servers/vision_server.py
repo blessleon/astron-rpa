@@ -85,14 +85,14 @@ class VisionServer:
 
     def _start_session(self, action: VisionAction, sign: dict) -> None:
         """启动独立线程运行状态机，单会话保护"""
-        logger.info(
-            f"VisionServer _start_session enter action={action.value} "
-            f"active_alive={bool(self._active_thread and self._active_thread.is_alive())} "
-            f"queue={self._queue_size()} "
-            f"sign_keys={list(getattr(sign, 'map', sign).keys()) if hasattr(sign, 'map') else 'unknown'}"
-        )
+        # logger.info(
+        #     f"VisionServer _start_session enter action={action.value} "
+        #     f"active_alive={bool(self._active_thread and self._active_thread.is_alive())} "
+        #     f"queue={self._queue_size()} "
+        #     f"sign_keys={list(getattr(sign, 'map', sign).keys()) if hasattr(sign, 'map') else 'unknown'}"
+        # )
         with self._lock:
-            logger.info(f"VisionServer _start_session lock_acquired action={action.value}")
+            # logger.info(f"VisionServer _start_session lock_acquired action={action.value}")
             if self._active_thread and self._active_thread.is_alive():
                 logger.warning(
                     f"VisionServer _start_session skipped action={action.value} "
@@ -402,6 +402,22 @@ class VisionServer:
             if event_core.is_shift_pressed():
                 logger.info(f"VisionServer _mouse_track_loop shift session={self._current_session_id}")
                 return "shift"
+
+            # 监听点击：命中候选框时，主动把命中框推送给 hl（对齐 designate 的点击命中行为）
+            left_clicked = event_core.is_left_click()
+            if left_clicked:
+                event_core.reset_left_click_flag()
+            if left_clicked and bboxes:
+                cx, cy = pyautogui.position()
+                hit_box = self._get_minbox(cx, cy, bboxes)
+                logger.info(
+                    f"VisionServer _mouse_track_loop click session={self._current_session_id} "
+                    f"mouse=({cx},{cy}) hit={hit_box}"
+                )
+                if hit_box is not None:
+                    bx, by, bw, bh = hit_box
+                    draw_rect = hit_box
+                    hl.draw_sync(Rect(bx, by, bx + bw, by + bh), "", "vision_pick")
 
             # 检查 hl feedback
             try:
