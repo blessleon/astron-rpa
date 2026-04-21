@@ -265,20 +265,38 @@ class VisionServer:
                     )
                     hl.cv_shortcutkey_sync("alt")
                     logger.info(f"VisionServer _run_start alt_shortcut_sent session={self._current_session_id}")
-                    screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
-                    if screenshot_data is None:
-                        logger.warning(
-                            f"VisionServer _run_start alt_wait_screenshot_timeout session={self._current_session_id}"
+                    # 对齐原 vision-picker：ALT 模式优先使用本机全屏截图作为分割输入
+                    # （避免依赖 hl 回传 base64 图像带来的尺寸/内容差异）。
+                    desktop_image = None
+                    try:
+                        shot_started = time.time()
+                        desktop_image = pyautogui.screenshot()
+                        logger.info(
+                            f"VisionServer _run_start alt_local_screenshot_ready session={self._current_session_id} "
+                            f"elapsed={time.time() - shot_started:.3f}"
                         )
-                        current_mode = None
-                        continue
-                    desktop_image = self._decode_screenshot(screenshot_data)
+                    except Exception as e:
+                        logger.warning(
+                            f"VisionServer _run_start alt_local_screenshot_failed session={self._current_session_id} "
+                            f"err={e}, fallback=hl_feedback"
+                        )
+
+                    # 兜底：若本机截图失败，回退到 hl 回传截图流程，避免功能中断。
                     if desktop_image is None:
-                        logger.warning(
-                            f"VisionServer _run_start alt_decode_screenshot_failed session={self._current_session_id}"
-                        )
-                        current_mode = None
-                        continue
+                        screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
+                        if screenshot_data is None:
+                            logger.warning(
+                                f"VisionServer _run_start alt_wait_screenshot_timeout session={self._current_session_id}"
+                            )
+                            current_mode = None
+                            continue
+                        desktop_image = self._decode_screenshot(screenshot_data)
+                        if desktop_image is None:
+                            logger.warning(
+                                f"VisionServer _run_start alt_decode_screenshot_failed session={self._current_session_id}"
+                            )
+                            current_mode = None
+                            continue
                     screen_w, screen_h = desktop_image.size
                     logger.info(
                         f"VisionServer _run_start alt_screenshot_ready session={self._current_session_id} "

@@ -2,6 +2,7 @@ import base64
 import contextlib
 import io
 
+import cv2
 import pyautogui
 import numpy as np
 from PIL import Image
@@ -82,11 +83,65 @@ class ImageDetector(VisionImageDetector):
 
         return keep_boxes
 
-    def detect_objects(self, dash_color, line_width):
+    def detect_objects(self, dash_color, line_width, draw_boxes: bool = False):
         """
-        复用基类流程，但屏蔽基类内的 print 调试输出，
-        避免全屏大列表输出拖慢处理。
+        默认使用快速路径：仅计算候选框，不做虚线绘制与深拷贝。
+        若需要兼容旧行为可传 draw_boxes=True。
         """
+        if draw_boxes:
+            with contextlib.redirect_stdout(io.StringIO()):
+                return super().detect_objects(dash_color, line_width)
+
+        # 下面逻辑与基类 detect_objects 保持同等筛选流程，
+        # 但跳过 output 图绘制阶段，减少全屏场景耗时。
+        blurred = cv2.GaussianBlur(self.gray_img, (3, 3), 0)
+        kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
+        sharpened = cv2.filter2D(blurred, -1, kernel)
+
+        canny_gradient = self.compute_canny_edge(sharpened)
+        sobel_gradient = self.compute_sobel_gradient(sharpened)
+
+        _, fore_g = cv2.threshold(canny_gradient, 127, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        kernel = np.ones((3, 3), np.uint8)
+        fore_g = cv2.dilate(fore_g, kernel, iterations=2)
+        _, fore_markers = cv2.connectedComponents(fore_g)
+        fore_markers = fore_markers.astype(np.uint8)
+        fore_contours, _ = cv2.findContours(fore_markers.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        sobel_contours = self.preprocess_stage(sobel_gradient, False)
+        canny_contours = self.preprocess_stage(canny_gradient, False)
+
+        img_h, img_w = self.original_img.shape[0], self.original_img.shape[1]
+        img_area = img_h * img_w
+
+        fore_boxes = [
+            (x, y, w, h)
+            for x, y, w, h in (cv2.boundingRect(contour) for contour in fore_contours)
+            if (w * h) > 50 and (h / w) < 10 and (w * h) / img_area < 0.2
+        ]
+
+        sobel_boxes = [
+            (x, y, w, h)
+            for x, y, w, h in (cv2.boundingRect(contour) for contour in sobel_contours)
+            if (w * h) > 50 and (h / w) < 10 and (w * h) / img_area < 0.2
+        ]
+
+        # 保留与基类一致的中间计算（当前基类最终未并入 canny_boxes），避免行为意外漂移。
+        _ = [
+            (x, y, w, h)
+            for x, y, w, h in (cv2.boundingRect(contour) for contour in canny_contours)
+            if ((w * h) > 20 and (w * h) <= 50)
+            or ((w * h) > 200 and (w * h) <= 350)
+            and (h / w) < 10
+            and (w * h) / img_area < 0.2
+        ]
+
+        all_boxes = [list(box) for box in (fore_boxes + sobel_boxes)]
+        selected_boxes = self.apply_nms(all_boxes)
+        return self.original_img, selected_boxes
+
+    def detect_objects_legacy(self, dash_color, line_width):
+        """调试用：强制走基类完整路径（含绘制）。"""
         with contextlib.redirect_stdout(io.StringIO()):
             return super().detect_objects(dash_color, line_width)
 
