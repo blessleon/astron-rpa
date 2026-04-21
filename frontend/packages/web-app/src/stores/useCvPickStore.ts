@@ -5,8 +5,10 @@ import { ref } from 'vue'
 
 import { RpaCvPicker } from '@/api/cvpick'
 import { windowManager } from '@/platform'
+import { useCreateWindow } from '@/hooks/useCreateWindow'
 
 export const useCvPickStore = defineStore('cvPickStore', () => {
+  const { openHighlightWindow } = useCreateWindow()
   const isPicking = ref(false) // 正在拾取
   const isChecking = ref(false) // 正在校验
 
@@ -39,6 +41,7 @@ export const useCvPickStore = defineStore('cvPickStore', () => {
    */
   const startCvPick = (type: string, element: any, pickStep = 'new', callback: (params: { success: boolean, data: any }) => void) => {
     isPicking.value = true
+    openHighlightWindow({ pickMode:  pickTypeMap.cv })
     // 启动拾取
     RpaCvPicker.create(() => {
       windowManager.minimizeWindow()
@@ -97,6 +100,7 @@ export const useCvPickStore = defineStore('cvPickStore', () => {
   const startCvCheck = (type: string, data: any, callback: (params: { success: boolean, data: any }) => void) => {
     // console.log('startCheck: ', data)
     isChecking.value = true
+    openHighlightWindow({ pickMode:  pickTypeMap.cv })
     // 启动校验
     RpaCvPicker.create(() => {
       windowManager.minimizeWindow()

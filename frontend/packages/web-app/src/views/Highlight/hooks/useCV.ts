@@ -90,7 +90,14 @@ export function useCV() {
   }
   const confirmCvCtrlPick = (params: { imageDataUrl: string, position: HighlightRect}) => {
     const data = params.position
-    sendFeedback('confirm', { Boxes: [{ "Left": data.x, "Top": data.y, "Right": data.x + data.width, "Bottom": data.y + data.height }] })
+    const pos = {
+      "Left": Math.floor(data.x * dpr),
+      "Top": Math.floor(data.y * dpr),
+      "Right": Math.floor((data.x + data.width) * dpr),
+      "Bottom": Math.floor((data.y + data.height) * dpr),
+    }
+    console.log('confirmCvCtrlPick: ', pos);
+    sendFeedback('confirm', { Boxes: [pos] })
   }
 
   const reCvAltPick = () => {

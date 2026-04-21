@@ -11,15 +11,16 @@ import { currentLocale, t } from './locale'
 const { targetRect, confirmCvCtrlPick, confirmCvAltPick, sendScreenshot, reCvAltPick, handleMessage: handleCvMessage } = useCV()
 
 const {
-  highlightBox,
   mousePos,
-  appName,
+  // appName,
   pickMode,
   tooltipVisible,
   tooltipPos,
+  tagPosition,
   shortcuts,
   cvCropShow,
   pickStep,
+  highlightRects,
   setPickStep,
 } = useHighlight(handleCvMessage)
 
@@ -27,7 +28,19 @@ const {
 
 <template>
     <div class="highlight-overlay">
-      <div ref="highlightBox" :class="`highlight-area  ${pickMode === PickMode.VALIDATE ? 'highlight-area-validate' : ''}`">
+      <div :class="`highlight-area  ${pickMode === PickMode.VALIDATE ? 'highlight-area-validate' : ''}`">
+        <div
+          v-for="(rect, index) in highlightRects"
+          :key="index"
+          :class="`highlight-box ${pickMode === PickMode.VALIDATE ? 'highlight-box-validate' : ''}`"
+          :style="{
+            transform: `translate(${rect.x}px, ${rect.y}px)`,
+            width: rect.width + 'px',
+            height: rect.height + 'px',
+          }"
+        >
+          <div v-if="rect.tag" :class="`highlight-tag highlight-tag-${tagPosition}`">{{ rect.tag }}</div>
+        </div>
       </div>
 
       <CV

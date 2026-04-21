@@ -8,6 +8,7 @@ import { windowManager } from '@/platform'
 import type { PickParams } from '@/types/resource'
 
 import { useVariableStore } from './useVariableStore'
+import { useCreateWindow } from '@/hooks/useCreateWindow'
 
 export const useBatchPickStore = defineStore('batchPick', () => {
   const isPicking = ref(false)
@@ -16,6 +17,7 @@ export const useBatchPickStore = defineStore('batchPick', () => {
   let isHighlight = false // 是否高亮元素
 
   const { t } = useTranslation()
+  const { openHighlightWindow } = useCreateWindow()
 
   const pickTypeMap = {
     BATCH: 'BATCH', // 批量抓取
@@ -41,7 +43,7 @@ export const useBatchPickStore = defineStore('batchPick', () => {
     console.log('startBatchPick: ', batchParams)
     type = type.toUpperCase()
     isPicking.value = true
-
+    openHighlightWindow({ pickMode:  pickTypeMap.BATCH })
     // 启动拾取
     RpaPicker.create(() => {
       const _pickType = pickTypeMap[type] || 'BATCH'
