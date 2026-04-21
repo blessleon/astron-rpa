@@ -16,10 +16,11 @@ import time
 import traceback
 
 import pyautogui
-from pynput import keyboard
 
 from astronverse.picker import VisionAction, VisionHlFeedback
 from astronverse.picker.logger import logger
+from astronverse.picker.utils.vision_adapter import AnchorMatch, ImageDetector, PickCore, RectHandler
+
 
 class VisionServer:
     """视觉拾取服务 - 独立线程状态机"""
@@ -29,14 +30,50 @@ class VisionServer:
         self._hl_feedback_queue: queue.Queue = queue.Queue()
         self._active_thread: threading.Thread | None = None
         self._lock = threading.Lock()
+        self._session_seq = 0
+        self._current_session_id: str | None = None
 
     # ------------------------------------------------------------------
     # 公共接口
     # ------------------------------------------------------------------
 
+    def _queue_size(self) -> str:
+        try:
+            return str(self._hl_feedback_queue.qsize())
+        except Exception:
+            return "unknown"
+
+    @staticmethod
+    def _feedback_type(data: dict) -> str:
+        if not isinstance(data, dict):
+            return type(data).__name__
+        return str(data.get("feedback_type"))
+
+    @staticmethod
+    def _box_summary(box) -> str:
+        if not isinstance(box, dict):
+            return str(box)
+        return (
+            f"Left={box.get('Left')},Top={box.get('Top')},"
+            f"Right={box.get('Right')},Bottom={box.get('Bottom')}"
+        )
+
     def on_hl_feedback(self, data: dict) -> None:
         """由 WsServer 在 hl 消息到达时调用（异步上下文，线程安全）"""
+        logger.info(
+            "VisionServer on_hl_feedback session=%s type=%s queue_before=%s payload=%s",
+            self._current_session_id,
+            self._feedback_type(data),
+            self._queue_size(),
+            data,
+        )
         self._hl_feedback_queue.put(data)
+        logger.info(
+            "VisionServer on_hl_feedback queued session=%s type=%s queue_after=%s",
+            self._current_session_id,
+            self._feedback_type(data),
+            self._queue_size(),
+        )
 
     def handle(self, sign: dict) -> None:
         """由 PickerServer 在主轮询线程调用"""
@@ -53,29 +90,67 @@ class VisionServer:
 
     def _start_session(self, action: VisionAction, sign: dict) -> None:
         """启动独立线程运行状态机，单会话保护"""
+        logger.info(
+            "VisionServer _start_session enter action=%s active_alive=%s queue=%s sign_keys=%s",
+            action.value,
+            bool(self._active_thread and self._active_thread.is_alive()),
+            self._queue_size(),
+            list(getattr(sign, "map", sign).keys()) if hasattr(sign, "map") else "unknown",
+        )
         with self._lock:
+            logger.info("VisionServer _start_session lock_acquired action=%s", action.value)
             if self._active_thread and self._active_thread.is_alive():
-                # logger.warning("VisionServer: 已有活跃会话，忽略新请求")
+                logger.warning(
+                    "VisionServer _start_session skipped action=%s reason=active_thread_running thread=%s",
+                    action.value,
+                    self._active_thread.name,
+                )
                 return
             # 清空旧 feedback
+            cleared = 0
             while not self._hl_feedback_queue.empty():
                 try:
                     self._hl_feedback_queue.get_nowait()
+                    cleared += 1
                 except queue.Empty:
                     break
+            if cleared:
+                logger.info(
+                    "VisionServer _start_session cleared_feedback action=%s cleared=%s",
+                    action.value,
+                    cleared,
+                )
 
             data = sign[action.value]
+            self._session_seq += 1
+            session_id = f"{action.value}-{self._session_seq}"
+            self._current_session_id = session_id
             self._active_thread = threading.Thread(
                 target=self._run_session,
-                args=(action, data, sign),
+                args=(action, data, sign, session_id),
                 daemon=True,
+                name=f"vision-{session_id}",
+            )
+            logger.info(
+                "VisionServer _start_session thread_start action=%s session=%s thread=%s data_keys=%s",
+                action.value,
+                session_id,
+                self._active_thread.name,
+                list(data.keys()) if isinstance(data, dict) else type(data).__name__,
             )
             self._active_thread.start()
 
-    def _run_session(self, action: VisionAction, data: dict, sign: dict) -> None:
+    def _run_session(self, action: VisionAction, data: dict, sign: dict, session_id: str) -> None:
         """状态机主入口（在独立线程中运行）"""
         result_key = f"{action.value}_RES"
         result = None
+        logger.info(
+            "VisionServer _run_session start session=%s action=%s thread=%s queue=%s",
+            session_id,
+            action.value,
+            threading.current_thread().name,
+            self._queue_size(),
+        )
         try:
             if action == VisionAction.START:
                 result = self._run_start()
@@ -84,27 +159,60 @@ class VisionServer:
             elif action == VisionAction.DESIGNATE:
                 result = self._run_designate(data)
         except Exception as e:
-            logger.error("VisionServer 会话异常: %s\n%s", e, traceback.format_exc())
-            result = str(e)
+            logger.error("VisionServer _run_session exception session=%s action=%s err=%s %s", session_id, action.value, e, traceback.format_exc())
+            result = self._error("internal_error")
         finally:
+            logger.info(
+                "VisionServer _run_session finish session=%s action=%s result=%s",
+                session_id,
+                action.value,
+                result,
+            )
             del sign[action.value]
             sign[result_key] = result
+            if self._current_session_id == session_id:
+                self._current_session_id = None
+
+    @staticmethod
+    def _success(data: str | None = None) -> dict:
+        return {"status": "success", "data": data}
+
+    @staticmethod
+    def _error(code: str) -> dict:
+        return {"status": "error", "code": code}
+
+    @staticmethod
+    def _cancel(code: str = "cancel") -> dict:
+        return {"status": "cancel", "code": code}
+
+    @staticmethod
+    def _has_signal(event_core, signal: str) -> bool:
+        if signal == "esc":
+            return event_core.is_cancel()
+        if signal == "alt":
+            return event_core.is_alt_pressed()
+        if signal == "ctrl":
+            return event_core.is_ctrl_pressed()
+        if signal == "shift":
+            return event_core.is_shift_pressed()
+        return False
 
     # ------------------------------------------------------------------
     # START 状态机
     # ------------------------------------------------------------------
 
-    def _run_start(self) -> str | None:
+    def _run_start(self) -> dict:
         hl = self.svc.ws_server.hl
+        event_core = self.svc.event_core
+        logger.info("VisionServer _run_start begin session=%s", self._current_session_id)
         hl.start_sync("vision")
-        logger.info("VisionServer: START 状态机启动")
-
-        current_keys: set = set()
-        key_event: dict = {"mode": None}
-        key_lock = threading.Lock()
+        logger.info("VisionServer _run_start hl.start_sync done session=%s", self._current_session_id)
+        event_core.start()
+        logger.info("VisionServer _run_start event_core.start done session=%s", self._current_session_id)
 
         # 需求1：全程鼠标追踪
         mouse_stop = threading.Event()
+
         def mouse_track_worker():
             last_pos = None
             while not mouse_stop.is_set():
@@ -113,67 +221,83 @@ class VisionServer:
                     last_pos = (cur_x, cur_y)
                     hl.mouse_move_sync(cur_x, cur_y)
                 time.sleep(0.05)
+
         threading.Thread(target=mouse_track_worker, daemon=True).start()
-
-        def on_press(key):
-            current_keys.add(key)
-            with key_lock:
-                if key == keyboard.Key.esc:
-                    key_event["mode"] = "esc"
-                    logger.info("VisionServer: esc 状态机启动")
-                elif key in (keyboard.Key.alt_l, keyboard.Key.alt_gr) and len(current_keys) == 1:
-                    key_event["mode"] = "alt"
-                    logger.info("VisionServer: alt 状态机启动")
-                elif key in (keyboard.Key.ctrl_l, keyboard.Key.ctrl_r) and len(current_keys) == 1:
-                    key_event["mode"] = "ctrl"
-                    logger.info("VisionServer: ctrl 状态机启动")
-                elif key in (keyboard.Key.shift_l, keyboard.Key.shift_r) and len(current_keys) == 1:
-                    key_event["mode"] = "shift"
-                    logger.info("VisionServer: shift 状态机启动")
-
-        def on_release(key):
-            current_keys.discard(key)
-
-        listener = keyboard.Listener(on_press=on_press, on_release=on_release)
-        listener.start()
 
         try:
             start_time = time.time()
             timeout = 60 * 3
+            current_mode = None
+            last_signal_log = 0.0
 
             while True:
                 if time.time() - start_time > timeout:
+                    logger.warning("VisionServer _run_start timeout session=%s elapsed=%.3f", self._current_session_id, time.time() - start_time)
                     hl.hide_sync()
-                    return "cancel"
+                    return self._error("timeout")
 
-                with key_lock:
-                    mode = key_event.get("mode")
-                    key_event["mode"] = None
-
-                if mode == "esc":
+                if event_core.is_cancel():
+                    logger.info("VisionServer _run_start cancel_detected session=%s", self._current_session_id)
                     hl.hide_sync()
-                    return "cancel"
+                    return self._cancel()
 
-                if mode == "shift":
+                now = time.time()
+                if now - last_signal_log > 1:
+                    logger.info(
+                        "VisionServer _run_start heartbeat session=%s mode=%s ctrl=%s alt=%s shift=%s cancel=%s queue=%s",
+                        self._current_session_id,
+                        current_mode,
+                        event_core.is_ctrl_pressed(),
+                        event_core.is_alt_pressed(),
+                        event_core.is_shift_pressed(),
+                        event_core.is_cancel(),
+                        self._queue_size(),
+                    )
+                    last_signal_log = now
+
+                if current_mode is None and self._has_signal(event_core, "shift"):
+                    logger.info("VisionServer _run_start shift_enter session=%s", self._current_session_id)
                     hl.cv_initialize_sync("shift")
+                    current_mode = "shift"
                     continue
 
-                if mode == "alt":
+                if current_mode == "shift" and not self._has_signal(event_core, "shift"):
+                    logger.info("VisionServer _run_start shift_release session=%s", self._current_session_id)
+                    current_mode = None
+
+                if current_mode is None and self._has_signal(event_core, "alt"):
+                    current_mode = "alt"
+                    logger.info("VisionServer _run_start alt_enter session=%s queue=%s", self._current_session_id, self._queue_size())
                     hl.cv_shortcutkey_sync("alt")
-                    logger.info("alt VisionServer: 等待截图")
+                    logger.info("VisionServer _run_start alt_shortcut_sent session=%s", self._current_session_id)
                     screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
                     if screenshot_data is None:
-                        logger.warning("VisionServer: 截图超时，重新等待")
+                        logger.warning("VisionServer _run_start alt_wait_screenshot_timeout session=%s", self._current_session_id)
+                        current_mode = None
                         continue
                     desktop_image = self._decode_screenshot(screenshot_data)
                     if desktop_image is None:
+                        logger.warning("VisionServer _run_start alt_decode_screenshot_failed session=%s", self._current_session_id)
+                        current_mode = None
                         continue
                     screen_w, screen_h = desktop_image.size
+                    logger.info("VisionServer _run_start alt_screenshot_ready session=%s size=%sx%s", self._current_session_id, screen_w, screen_h)
                     bboxes, partial_rect = self._detect_alt(desktop_image)
-                    result = self._mouse_track_loop(hl, desktop_image, bboxes, screen_w, screen_h)
+                    logger.info(
+                        "VisionServer _run_start alt_detect_done session=%s bbox_count=%s partial_rect=%s",
+                        self._current_session_id,
+                        len(bboxes) if bboxes else 0,
+                        partial_rect,
+                    )
+                    result = self._mouse_track_loop(hl, bboxes, screen_w, screen_h)
+                    logger.info("VisionServer _run_start alt_track_result session=%s result=%s", self._current_session_id, result)
+                    current_mode = None
+                    if result == "timeout":
+                        hl.hide_sync()
+                        return self._error("timeout")
                     if result == "cancel":
                         hl.hide_sync()
-                        return "cancel"
+                        return self._cancel()
                     if result == "shift":
                         hl.cv_initialize_sync("shift")
                         continue
@@ -181,46 +305,67 @@ class VisionServer:
                         pick_result = self._check_target(result, desktop_image, bboxes, partial_rect)
                         if pick_result:
                             hl.hide_sync()
-                            return pick_result
+                            return self._success(pick_result)
                         continue
 
-                elif mode == "ctrl":
+                if current_mode is None and self._has_signal(event_core, "ctrl"):
+                    logger.info("VisionServer _run_start ctrl_enter session=%s queue=%s", self._current_session_id, self._queue_size())
+                    current_mode = "ctrl"
                     hl.cv_shortcutkey_sync("ctrl")
-                    logger.info("ctrl VisionServer: 等待截图")
-                    # screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
-                    # if screenshot_data is None:
-                    #     logger.warning("VisionServer: 截图超时，重新等待")
-                    #     continue
-                    confirm_result = self._wait_ctrl_confirm(key_event, key_lock)
+                    logger.info("VisionServer _run_start ctrl_shortcut_sent session=%s", self._current_session_id)
+                    confirm_result = self._wait_ctrl_confirm(timeout_sec=timeout)
+                    logger.info("VisionServer _run_start ctrl_confirm_result session=%s result=%s", self._current_session_id, confirm_result)
+                    current_mode = None
+                    if confirm_result == "timeout":
+                        hl.hide_sync()
+                        return self._error("timeout")
                     if confirm_result == "cancel":
                         hl.hide_sync()
-                        return "cancel"
+                        return self._cancel()
                     box = confirm_result[0]
                     target_rect_ltrb = (box["Left"], box["Top"], box["Right"], box["Bottom"])
                     l, t, r, b = box["Left"], box["Top"], box["Right"], box["Bottom"]
-                    desktop_image = self._decode_screenshot(screenshot_data)
-                    partial_rect = (0, 0, desktop_image.width, desktop_image.height)
+                    logger.info(
+                        "VisionServer _run_start ctrl_box session=%s box=%s width=%s height=%s",
+                        self._current_session_id,
+                        self._box_summary(box),
+                        r - l,
+                        b - t,
+                    )
+                    desktop_image = None
+                    screenshot_started = time.time()
                     target_img = pyautogui.screenshot(region=(l, t, r - l, b - t))
-                    
-                    import sys
-                    import platform as _platform
-                    if sys.platform == "win32":
-                        from astronverse.vision_picker.core.core_win import PickCore
-                    elif _platform.system() == "Linux":
-                        from astronverse.vision_picker.core.core_unix import PickCore
-                    else:
-                        from astronverse.vision_picker.core.core_mac import PickCore
-                    pick_result = PickCore.json_res(target_img, target_rect_ltrb, None, None, partial_rect)
-
+                    logger.info(
+                        "VisionServer _run_start ctrl_capture_done session=%s elapsed=%.3f size=%sx%s",
+                        self._current_session_id,
+                        time.time() - screenshot_started,
+                        getattr(target_img, "width", None),
+                        getattr(target_img, "height", None),
+                    )
+                    logger.info("VisionServer _run_start ctrl_pickcore_ready session=%s", self._current_session_id)
+                    json_res_started = time.time()
+                    pick_result = PickCore.json_res(target_img, target_rect_ltrb, None, None, None)
+                    logger.info(
+                        "VisionServer _run_start ctrl_json_res_done session=%s elapsed=%.3f has_result=%s",
+                        self._current_session_id,
+                        time.time() - json_res_started,
+                        bool(pick_result),
+                    )
                     hl.hide_sync()
-                    return pick_result if pick_result else "cancel"
+                    logger.info("VisionServer _run_start ctrl_hide_done session=%s", self._current_session_id)
+                    if pick_result:
+                        logger.info("VisionServer _run_start ctrl_success session=%s", self._current_session_id)
+                        return self._success(pick_result)
+                    logger.warning("VisionServer _run_start ctrl_target_not_found session=%s", self._current_session_id)
+                    return self._error("target_not_found")
 
                 time.sleep(0.05)
         finally:
+            logger.info("VisionServer _run_start finally session=%s", self._current_session_id)
             mouse_stop.set()
-            listener.stop()
+            event_core.close()
 
-    def _mouse_track_loop(self, hl, desktop_image, bboxes, screen_w, screen_h):
+    def _mouse_track_loop(self, hl, bboxes, screen_w, screen_h):
         """
         鼠标追踪循环：实时发送鼠标位置和命中 rect 给 hl
         返回：
@@ -230,16 +375,25 @@ class VisionServer:
             - None：stop 信号
         """
         from astronverse.picker import Rect
+        event_core = self.svc.event_core
 
         last_mouse_pos = None
         draw_rect = None
-        last_draw_rect = None
         start_time = time.time()
         timeout = 60 * 3
 
         while True:
             if time.time() - start_time > timeout:
+                logger.warning("VisionServer _mouse_track_loop timeout session=%s", self._current_session_id)
+                return "timeout"
+
+            if event_core.is_cancel():
+                logger.info("VisionServer _mouse_track_loop cancel session=%s", self._current_session_id)
                 return "cancel"
+
+            if event_core.is_shift_pressed():
+                logger.info("VisionServer _mouse_track_loop shift session=%s", self._current_session_id)
+                return "shift"
 
             # 检查 hl feedback
             try:
@@ -248,11 +402,17 @@ class VisionServer:
                 if fb_type == VisionHlFeedback.CONFIRM.value:
                     # hl 回传了确认的 rect
                     boxes = feedback.get("data", {}).get("Boxes", [])
+                    logger.info(
+                        "VisionServer _mouse_track_loop confirm session=%s boxes=%s",
+                        self._current_session_id,
+                        boxes,
+                    )
                     if boxes:
                         b = boxes[0]
                         return (b["Left"], b["Top"], b["Right"], b["Bottom"])
                     return draw_rect
                 elif fb_type == VisionHlFeedback.CONTINUE.value:
+                    logger.info("VisionServer _mouse_track_loop continue session=%s", self._current_session_id)
                     continue
             except queue.Empty:
                 pass
@@ -269,6 +429,13 @@ class VisionServer:
 
                 if new_rect != draw_rect:
                     draw_rect = new_rect
+                    logger.info(
+                        "VisionServer _mouse_track_loop rect_change session=%s mouse=(%s,%s) rect=%s",
+                        self._current_session_id,
+                        cur_x,
+                        cur_y,
+                        draw_rect,
+                    )
                     if draw_rect:
                         bx, by, bw, bh = draw_rect
                         r = Rect(bx, by, bx + bw, by + bh)
@@ -294,55 +461,40 @@ class VisionServer:
             - None：CONFIRM 数据异常
         """
         from astronverse.picker import Rect
-        from pynput import mouse as pynput_mouse
+        event_core = self.svc.event_core
 
         last_mouse_pos = None
         last_anchor_rect = None
         start_time = time.time()
         timeout = 60 * 3
 
-        # ── ESC 监听 ──────────────────────────────────────────────────────
-        esc_pressed = threading.Event()
-
-        def on_key_press(key):
-            if key == keyboard.Key.esc:
-                esc_pressed.set()
-
-        key_listener = keyboard.Listener(on_press=on_key_press)
-        key_listener.start()
-
-        # ── 鼠标点击监听 ─────────────────────────────────────────────────
-        # 用 list 包装，避免闭包赋值问题
-        pending_click: list[tuple[int, int] | None] = [None]
-        click_lock = threading.Lock()
-
-        def on_mouse_click(x, y, button, pressed):
-            if pressed and button == pynput_mouse.Button.left:
-                with click_lock:
-                    pending_click[0] = (x, y)
-
-        mouse_listener = pynput_mouse.Listener(on_click=on_mouse_click)
-        mouse_listener.start()
-
         try:
             while True:
                 if time.time() - start_time > timeout:
+                    logger.warning("VisionServer _designate_track_loop timeout session=%s", self._current_session_id)
                     hl.hide_sync()
-                    return "cancel"
+                    return "timeout"
 
                 # ── 检查 ESC ─────────────────────────────────────────────
-                if esc_pressed.is_set():
+                if event_core.is_cancel():
+                    logger.info("VisionServer _designate_track_loop cancel session=%s", self._current_session_id)
                     hl.hide_sync()
                     return "cancel"
 
                 # ── 检查点击：命中候选锚点则发送 click_confirm ────────────
-                with click_lock:
-                    click_pos = pending_click[0]
-                    pending_click[0] = None
-
-                if click_pos is not None and bboxes:
-                    cx, cy = click_pos
+                left_clicked = event_core.is_left_click()
+                if left_clicked:
+                    event_core.reset_left_click_flag()
+                if left_clicked and bboxes:
+                    cx, cy = pyautogui.position()
                     hit_box = self._get_minbox(cx, cy, bboxes)
+                    logger.info(
+                        "VisionServer _designate_track_loop click session=%s mouse=(%s,%s) hit=%s",
+                        self._current_session_id,
+                        cx,
+                        cy,
+                        hit_box,
+                    )
                     if hit_box is not None:
                         bx, by, bw, bh = hit_box
                         anchor_rect_obj = Rect(bx, by, bx + bw, by + bh)
@@ -357,9 +509,13 @@ class VisionServer:
                     feedback = self._hl_feedback_queue.get_nowait()
                     fb_type = feedback.get("feedback_type")
                     if fb_type == VisionHlFeedback.CONFIRM.value:
-                        # hl 已确认，直接从 data 中提取 anchor rect
-                        # data 结构待定，预期携带 Left/Top/Right/Bottom
-                        data = feedback.get("data",{}).get("Boxes",{})
+                        boxes = feedback.get("data", {}).get("Boxes", [])
+                        logger.info(
+                            "VisionServer _designate_track_loop confirm session=%s boxes=%s",
+                            self._current_session_id,
+                            boxes,
+                        )
+                        data = boxes[0] if isinstance(boxes, list) and boxes else boxes
                         try:
                             return (
                                 data["Left"],
@@ -371,6 +527,7 @@ class VisionServer:
                             logger.error("VisionServer: CONFIRM data 缺少 rect 字段: %s", data)
                             return None
                     elif fb_type == VisionHlFeedback.CONTINUE.value:
+                        logger.info("VisionServer _designate_track_loop continue session=%s", self._current_session_id)
                         continue
                 except queue.Empty:
                     pass
@@ -383,6 +540,13 @@ class VisionServer:
 
                     if anchor_rect != last_anchor_rect:
                         last_anchor_rect = anchor_rect
+                        logger.info(
+                            "VisionServer _designate_track_loop rect_change session=%s mouse=(%s,%s) rect=%s",
+                            self._current_session_id,
+                            cur_x,
+                            cur_y,
+                            anchor_rect,
+                        )
                         if anchor_rect is not None:
                             bx, by, bw, bh = anchor_rect
                             anchor_rect_obj = Rect(bx, by, bx + bw, by + bh)
@@ -398,36 +562,35 @@ class VisionServer:
 
                 time.sleep(0.05)
         finally:
-            key_listener.stop()
-            mouse_listener.stop()
+            event_core.reset_left_click_flag()
 
     # ------------------------------------------------------------------
     # VALIDATE 状态机
     # ------------------------------------------------------------------
 
-    def _run_validate(self, data: dict) -> str | None:
+    def _run_validate(self, data: dict) -> dict:
         """验证视觉元素是否仍然存在于屏幕上"""
         import json
-        from astronverse.vision_picker.core.core import IPickCore
-
         try:
+            logger.info("VisionServer _run_validate begin session=%s", self._current_session_id)
             # data 是原始请求消息，cv 数据在 data["data"] 字段中（JSON 字符串）
             cv_data = data.get("data")
             if isinstance(cv_data, str):
                 cv_data = json.loads(cv_data)
-            match_box = IPickCore.match_imgs(cv_data, remote_addr="")
+            match_box = PickCore.match_imgs(cv_data)
+            logger.info("VisionServer _run_validate match_result session=%s match_box=%s", self._current_session_id, match_box)
             if match_box:
-                return "valid"
-            return "invalid"
+                return self._success("校验成功")
+            return self._error("validate_not_found")
         except Exception as e:
             logger.error("VisionServer validate 失败: %s", e)
-            return None
+            return self._error("validate_failed")
 
     # ------------------------------------------------------------------
     # DESIGNATE 状态机
     # ------------------------------------------------------------------
 
-    def _run_designate(self, data: dict) -> str | None:
+    def _run_designate(self, data: dict) -> dict:
         """
         DESIGNATE 状态机（重拾锚点）：
         1. match_imgs 校验目标是否还在
@@ -435,55 +598,77 @@ class VisionServer:
         3. 请求 hl 截图 → 走锚点选取流程 → check_anchor → 返回结果
         """
         import json
-        from astronverse.vision_picker.core.core import IPickCore
-
         hl = self.svc.ws_server.hl
+        event_core = self.svc.event_core
+        logger.info("VisionServer _run_designate begin session=%s", self._current_session_id)
+        event_core.start()
+        logger.info("VisionServer _run_designate event_core.start done session=%s", self._current_session_id)
 
-        # data 是原始请求消息，cv 数据在 data["data"] 字段中（JSON 字符串）
-        cv_data = data.get("data")
-        if isinstance(cv_data, str):
-            cv_data = json.loads(cv_data)
+        try:
+            # data 是原始请求消息，cv 数据在 data["data"] 字段中（JSON 字符串）
+            cv_data = data.get("data")
+            if isinstance(cv_data, str):
+                cv_data = json.loads(cv_data)
+            logger.info("VisionServer _run_designate parsed_data session=%s has_data=%s", self._current_session_id, bool(cv_data))
 
-        # Step 1: 校验目标是否还在
-        match_box = IPickCore.match_imgs(cv_data, remote_addr="")
-        if not match_box:
-            return None
+            # Step 1: 校验目标是否还在
+            match_box = PickCore.match_imgs(cv_data)
+            logger.info("VisionServer _run_designate match_result session=%s match_box=%s", self._current_session_id, match_box)
+            if not match_box:
+                return self._error("designate_target_not_found")
 
-        # Step 2: 通知 hl 进入 designate 模式并发送目标 rect
-        from astronverse.picker import Rect
-        target_rect = None
-        if match_box and len(match_box) == 4:
-            mb = match_box
-            target_rect = Rect(mb[0], mb[1], mb[0] + mb[2], mb[1] + mb[3])
+            # Step 2: 通知 hl 进入 designate 模式并发送目标 rect
+            from astronverse.picker import Rect
+            target_rect = None
+            if match_box and len(match_box) == 4:
+                mb = match_box
+                target_rect = Rect(mb[0], mb[1], mb[0] + mb[2], mb[1] + mb[3])
 
-        hl.cv_start_sync("designate")
+            hl.cv_start_sync("designate")
+            logger.info("VisionServer _run_designate cv_start_sent session=%s target_rect=%s", self._current_session_id, target_rect)
 
-        # Step 3: 等待截图
-        screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
-        if screenshot_data is None:
-            return None
+            # Step 3: 等待截图
+            screenshot_data = self._wait_feedback(VisionHlFeedback.SCREENSHOT, timeout_sec=10)
+            if screenshot_data is None:
+                return self._error("timeout")
+            logger.info("VisionServer _run_designate screenshot_feedback session=%s keys=%s", self._current_session_id, list(screenshot_data.keys()) if isinstance(screenshot_data, dict) else type(screenshot_data).__name__)
 
-        desktop_image = self._decode_screenshot(screenshot_data)
-        if desktop_image is None:
-            return None
+            desktop_image = self._decode_screenshot(screenshot_data)
+            if desktop_image is None:
+                return self._error("designate_anchor_not_found")
+            logger.info("VisionServer _run_designate screenshot_decoded session=%s size=%sx%s", self._current_session_id, desktop_image.width, desktop_image.height)
 
-        # Step 4: 分割界面元素（ALT 模式）
-        bboxes, partial_rect = self._detect_alt(desktop_image)
+            # Step 4: 分割界面元素（ALT 模式）
+            bboxes, partial_rect = self._detect_alt(desktop_image)
+            logger.info("VisionServer _run_designate detect_done session=%s bbox_count=%s partial_rect=%s", self._current_session_id, len(bboxes) if bboxes else 0, partial_rect)
 
-        # Step 5: 发送统一 designate_pick 消息（target_ready 事件）
-        hl.designate_pick_sync(target_rect=target_rect, anchor_rect=None, event="target_ready")
+            # Step 5: 发送统一 designate_pick 消息（target_ready 事件）
+            hl.designate_pick_sync(target_rect=target_rect, anchor_rect=None, event="target_ready")
 
-        # Step 6: 鼠标追踪，等待用户选取锚点
-        result = self._designate_track_loop(hl, bboxes, target_rect)
-        if result in ("cancel", None):
+            # Step 6: 鼠标追踪，等待用户选取锚点
+            result = self._designate_track_loop(hl, bboxes, target_rect)
+            logger.info("VisionServer _run_designate track_result session=%s result=%s", self._current_session_id, result)
+            if result == "timeout":
+                hl.hide_sync()
+                return self._error("timeout")
+            if result == "cancel":
+                hl.hide_sync()
+                return self._cancel()
+            if result is None:
+                hl.hide_sync()
+                return self._error("designate_anchor_not_found")
+
+            # result 是 hl CONFIRM 回传的锚点 rect (left, top, right, bottom)，来源可信，直接传入校验
+            anchor_rect_ltrb = result
+            pick_result = self._check_anchor(anchor_rect_ltrb, desktop_image)
+            logger.info("VisionServer _run_designate check_anchor session=%s anchor_rect=%s has_result=%s", self._current_session_id, anchor_rect_ltrb, bool(pick_result))
             hl.hide_sync()
-            return "cancel"
-
-        # result 是 hl CONFIRM 回传的锚点 rect (left, top, right, bottom)，来源可信，直接传入校验
-        anchor_rect_ltrb = result
-        pick_result = self._check_anchor(anchor_rect_ltrb, desktop_image)
-        hl.hide_sync()
-        return pick_result
+            if pick_result:
+                return self._success(pick_result)
+            return self._error("designate_anchor_not_found")
+        finally:
+            logger.info("VisionServer _run_designate finally session=%s", self._current_session_id)
+            event_core.close()
 
     # ------------------------------------------------------------------
     # 算法辅助方法
@@ -498,13 +683,6 @@ class VisionServer:
 
         # 获取前景窗口
         try:
-            if sys.platform == "win32":
-                from astronverse.vision_picker.core.core_win import RectHandler
-            elif _platform.system() == "Linux":
-                from astronverse.vision_picker.core.core_unix import RectHandler
-            else:
-                from astronverse.vision_picker.core.core_mac import RectHandler
-
             _, _, win_rect = RectHandler.get_foreground_window_rect()
             x = max(win_rect[0], 0)
             y = max(win_rect[1], 0)
@@ -512,11 +690,20 @@ class VisionServer:
             h = min(win_rect[3] - win_rect[1], screen_h)
         except Exception:
             x, y, w, h = 0, 0, screen_w, screen_h
+        logger.info(
+            "VisionServer _detect_alt session=%s screen=(%s,%s) partial_rect=(%s,%s,%s,%s)",
+            self._current_session_id,
+            screen_w,
+            screen_h,
+            x,
+            y,
+            w,
+            h,
+        )
 
         partial_rect = (x, y, w, h)
         partial_screenshot = desktop_image.crop((x, y, x + w, y + h))
 
-        from astronverse.vision_picker.core.cv_picker import ImageDetector
         detector = ImageDetector(partial_screenshot)
         _, selected_boxes = detector.detect_objects("#00FF00", 1)
 
@@ -526,6 +713,7 @@ class VisionServer:
             for box in selected_boxes
         ]
         bboxes = sorted(bboxes, key=lambda b: b[2] * b[3])
+        logger.info("VisionServer _detect_alt selected session=%s bbox_count=%s", self._current_session_id, len(bboxes))
         return bboxes, partial_rect
 
     @staticmethod
@@ -552,16 +740,6 @@ class VisionServer:
         """
         import sys
         import platform as _platform
-
-        if sys.platform == "win32":
-            from astronverse.vision_picker.core.core_win import PickCore
-        elif _platform.system() == "Linux":
-            from astronverse.vision_picker.core.core_unix import PickCore
-        else:
-            from astronverse.vision_picker.core.core_mac import PickCore
-
-        from astronverse.vision_picker.core.cv_match import AnchorMatch
-        from astronverse.vision_picker.core.cv_picker import ImageDetector
 
         left, top, right, bottom = target_rect_ltrb
         target_img = desktop_image.crop((left, top, right, bottom))
@@ -592,15 +770,6 @@ class VisionServer:
         import sys
         import platform as _platform
 
-        if sys.platform == "win32":
-            from astronverse.vision_picker.core.core_win import PickCore
-        elif _platform.system() == "Linux":
-            from astronverse.vision_picker.core.core_unix import PickCore
-        else:
-            from astronverse.vision_picker.core.core_mac import PickCore
-
-        from astronverse.vision_picker.core.cv_match import AnchorMatch
-
         left, top, right, bottom = anchor_rect_ltrb
         anchor_img = desktop_image.crop((left, top, right, bottom))
         anchor_rect_xywh = (left, top, right - left, bottom - top)
@@ -613,48 +782,96 @@ class VisionServer:
     # ------------------------------------------------------------------
     # 工具方法
     # ------------------------------------------------------------------
-    def _wait_ctrl_confirm(self, key_event: dict, key_lock: threading.Lock, timeout_sec: float = 60 * 3):
+    def _wait_ctrl_confirm(self, timeout_sec: float = 60 * 3):
         """
         ctrl 模式下等待 hl 回传 CONFIRM，
         期间监听 ESC 可随时取消
         返回：Boxes dict | "cancel"
         """
         deadline = time.time() + timeout_sec
+        event_core = self.svc.event_core
+        logger.info("VisionServer _wait_ctrl_confirm begin session=%s timeout=%s queue=%s", self._current_session_id, timeout_sec, self._queue_size())
         while time.time() < deadline:
-            # 检查 ESC
-            with key_lock:
-                mode = key_event.get("mode")
-                if mode == "esc":
-                    key_event["mode"] = None
-                    return "cancel"
-
+            if event_core.is_cancel():
+                logger.info("VisionServer _wait_ctrl_confirm cancel session=%s", self._current_session_id)
+                return "cancel"
             # 检查 hl feedback
             try:
                 feedback = self._hl_feedback_queue.get(timeout=0.05)
                 fb_type = feedback.get("feedback_type")
+                logger.info(
+                    "VisionServer _wait_ctrl_confirm dequeued session=%s fb_type=%s queue_after_get=%s payload=%s",
+                    self._current_session_id,
+                    fb_type,
+                    self._queue_size(),
+                    feedback,
+                )
                 if fb_type == VisionHlFeedback.CONFIRM.value:
                     boxes = feedback.get("data", {}).get("Boxes", [])
+                    logger.info(
+                        "VisionServer _wait_ctrl_confirm confirm session=%s boxes=%s",
+                        self._current_session_id,
+                        boxes,
+                    )
                     if boxes:
+                        logger.info("VisionServer _wait_ctrl_confirm return session=%s boxes=%s", self._current_session_id, boxes)
                         return boxes  # 直接返回 Boxes 列表
+                    logger.warning("VisionServer _wait_ctrl_confirm empty_boxes session=%s", self._current_session_id)
                     return "cancel"
                 # 非预期类型放回
                 self._hl_feedback_queue.put(feedback)
+                logger.info(
+                    "VisionServer _wait_ctrl_confirm requeue session=%s fb_type=%s queue_after_put=%s",
+                    self._current_session_id,
+                    fb_type,
+                    self._queue_size(),
+                )
             except queue.Empty:
                 pass
 
-        return "cancel"
+        logger.warning("VisionServer _wait_ctrl_confirm timeout session=%s queue=%s", self._current_session_id, self._queue_size())
+        return "timeout"
+
     def _wait_feedback(self, expected_type: VisionHlFeedback, timeout_sec: float = 10) -> dict | None:
         """阻塞等待指定类型的 hl feedback，超时返回 None"""
         deadline = time.time() + timeout_sec
+        logger.info(
+            "VisionServer _wait_feedback begin session=%s expected=%s timeout=%s queue=%s",
+            self._current_session_id,
+            expected_type.value,
+            timeout_sec,
+            self._queue_size(),
+        )
         while time.time() < deadline:
             try:
                 feedback = self._hl_feedback_queue.get(timeout=0.1)
+                logger.info(
+                    "VisionServer _wait_feedback dequeued session=%s expected=%s actual=%s queue_after_get=%s",
+                    self._current_session_id,
+                    expected_type.value,
+                    feedback.get("feedback_type"),
+                    self._queue_size(),
+                )
                 if feedback.get("feedback_type") == expected_type.value:
+                    logger.info("VisionServer _wait_feedback matched session=%s expected=%s", self._current_session_id, expected_type.value)
                     return feedback.get("data", {})
                 # 非预期类型放回队列
                 self._hl_feedback_queue.put(feedback)
+                logger.info(
+                    "VisionServer _wait_feedback requeue session=%s expected=%s actual=%s queue_after_put=%s",
+                    self._current_session_id,
+                    expected_type.value,
+                    feedback.get("feedback_type"),
+                    self._queue_size(),
+                )
             except queue.Empty:
                 pass
+        logger.warning(
+            "VisionServer _wait_feedback timeout session=%s expected=%s queue=%s",
+            self._current_session_id,
+            expected_type.value,
+            self._queue_size(),
+        )
         return None
 
     @staticmethod
@@ -670,7 +887,15 @@ class VisionServer:
             return None
         try:
             img_bytes = base64.b64decode(b64)
-            return Image.open(io.BytesIO(img_bytes))
+            image = Image.open(io.BytesIO(img_bytes))
+            logger.info(
+                "VisionServer _decode_screenshot success bytes=%s size=%sx%s mode=%s",
+                len(img_bytes),
+                getattr(image, "width", None),
+                getattr(image, "height", None),
+                getattr(image, "mode", None),
+            )
+            return image
         except Exception as e:
             logger.error("VisionServer: 截图解码失败: %s", e)
             return None

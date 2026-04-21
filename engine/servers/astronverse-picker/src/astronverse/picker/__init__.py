@@ -212,6 +212,26 @@ class IEventCore(ABC):
     def reset_cancel_flag(self):
         """重置ESC键标志位"""
 
+    @abstractmethod
+    def is_ctrl_pressed(self):
+        """Ctrl 是否处于按下状态"""
+
+    @abstractmethod
+    def is_alt_pressed(self):
+        """Alt 是否处于按下状态"""
+
+    @abstractmethod
+    def is_shift_pressed(self):
+        """Shift 是否处于按下状态"""
+
+    @abstractmethod
+    def is_left_click(self):
+        """是否检测到左键点击"""
+
+    @abstractmethod
+    def reset_left_click_flag(self):
+        """重置左键点击标志位"""
+
 
 class IPickerCore(ABC):
     """拾取核心"""

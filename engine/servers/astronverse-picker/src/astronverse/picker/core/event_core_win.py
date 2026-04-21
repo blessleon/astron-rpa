@@ -15,22 +15,30 @@ class EventCore(IEventCore):
         self.__hook_manager = None
         self.__closed = True
         self.__control_down = False
+        self.__alt_down = False
+        self.__shift_down = False
         # 下面两个点击后 有一定的等待能力
         self.__esc = False
         self.__control_left_down = False
+        self.__left_click = False
         self.__init = False
         # 新增的标志位
         self.__f4_pressed = False  # F4键按下标志
 
     def __mouse_left_down__(self, event):
+        self.__left_click = True
         if self.__control_down:
             self.__control_left_down = True
             return False
         return True
 
     def __key_pressed__(self, event: KeyboardEvent):
-        if event.Key == "Lcontrol":
+        if event.Key in ("Lcontrol", "Rcontrol"):
             self.__control_down = True
+        elif event.Key in ("Lmenu", "Rmenu"):
+            self.__alt_down = True
+        elif event.Key in ("Lshift", "Rshift"):
+            self.__shift_down = True
         elif event.Key == "F4":
             self.__f4_pressed = True
         return True
@@ -38,8 +46,12 @@ class EventCore(IEventCore):
     def __key_released__(self, event: KeyboardEvent):
         if event.Key == "Escape":
             self.__esc = True
-        if event.Key == "Lcontrol":
+        if event.Key in ("Lcontrol", "Rcontrol"):
             self.__control_down = False
+        elif event.Key in ("Lmenu", "Rmenu"):
+            self.__alt_down = False
+        elif event.Key in ("Lshift", "Rshift"):
+            self.__shift_down = False
         return True
 
     def __un_hook__(self):
@@ -81,6 +93,21 @@ class EventCore(IEventCore):
         """重置ESC取消标志位"""
         self.__esc = False
 
+    def is_ctrl_pressed(self):
+        return self.__control_down
+
+    def is_alt_pressed(self):
+        return self.__alt_down
+
+    def is_shift_pressed(self):
+        return self.__shift_down
+
+    def is_left_click(self):
+        return self.__left_click
+
+    def reset_left_click_flag(self):
+        self.__left_click = False
+
     def start(self):
         if not self.__closed:
             return False
@@ -91,7 +118,10 @@ class EventCore(IEventCore):
         # 独立线程启动鼠标和键盘hook
         threading.Thread(target=self.__hook__, args=(), daemon=True).start()
         self.__control_down = False
+        self.__alt_down = False
+        self.__shift_down = False
         self.__control_left_down = False
+        self.__left_click = False
         self.__esc = False
         self.__f4_pressed = False
         self.__closed = False
@@ -107,7 +137,10 @@ class EventCore(IEventCore):
         logger.info("EventCore close")
         self.__un_hook__()
         self.__control_down = False
+        self.__alt_down = False
+        self.__shift_down = False
         self.__control_left_down = False
+        self.__left_click = False
         self.__esc = False
         self.__f4_pressed = False
         self.__closed = True

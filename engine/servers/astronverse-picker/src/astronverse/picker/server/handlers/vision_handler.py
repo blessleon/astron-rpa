@@ -49,12 +49,15 @@ class VisionHandler:
         """开始视觉拾取：阻塞等待 VisionServer 完成状态机"""
         try:
             result = await self.svc.send_sign(VisionAction.START.value, request_data)
-            if result == "cancel":
-                await self._send_response("cancel", error="")
-            elif result:
-                await self._send_response("success", data=result)
+            status = (result or {}).get("status")
+            if status == "success" and result.get("data"):
+                await self._send_response("success", data=result["data"])
+            elif status == "cancel":
+                await self._send_response("cancel", error="拾取取消")
+            elif (result or {}).get("code") == "timeout":
+                await self._send_response("error", error="拾取超时")
             else:
-                await self._send_response("error", error="视觉拾取失败")
+                await self._send_response("error", error="拾取失败，未拾取到元素")
         finally:
             await self.ws_server.hl.hide()
 
@@ -62,10 +65,16 @@ class VisionHandler:
         """验证视觉元素：阻塞等待 VisionServer 完成验证"""
         try:
             result = await self.svc.send_sign(VisionAction.VALIDATE.value, request_data)
-            if result == "cancel":
-                await self._send_response("cancel", error="")
-            elif result:
-                await self._send_response("success", data=result)
+            status = (result or {}).get("status")
+            code = (result or {}).get("code")
+            if status == "success":
+                await self._send_response("success", data=result.get("data", "校验成功"))
+            elif status == "cancel":
+                await self._send_response("cancel", error="拾取取消")
+            elif code == "validate_not_found":
+                await self._send_response("error", error="未校验到目标元素，请检查页面元素或降低校验相似度重试")
+            elif code == "timeout":
+                await self._send_response("error", error="拾取超时")
             else:
                 await self._send_response("error", error="视觉验证失败")
         finally:
@@ -75,10 +84,18 @@ class VisionHandler:
         """指定视觉元素（重拾锚点）：阻塞等待 VisionServer 完成"""
         try:
             result = await self.svc.send_sign(VisionAction.DESIGNATE.value, request_data)
-            if result == "cancel":
-                await self._send_response("cancel", error="")
-            elif result:
-                await self._send_response("success", data=result)
+            status = (result or {}).get("status")
+            code = (result or {}).get("code")
+            if status == "success" and result.get("data"):
+                await self._send_response("success", data=result["data"])
+            elif status == "cancel":
+                await self._send_response("cancel", error="拾取取消")
+            elif code == "designate_target_not_found":
+                await self._send_response("error", error="当前界面未检测到目标元素，无法拾取锚点")
+            elif code == "designate_anchor_not_found":
+                await self._send_response("error", error="拾取失败，未拾取到锚点元素")
+            elif code == "timeout":
+                await self._send_response("error", error="拾取超时")
             else:
                 await self._send_response("error", error="视觉指定失败")
         finally:

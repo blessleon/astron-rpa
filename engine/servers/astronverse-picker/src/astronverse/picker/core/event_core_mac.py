@@ -22,8 +22,11 @@ class EventCore(IEventCore):
         self.__tap_rl = None
         self.__closed = True
         self.__control_down = False
+        self.__alt_down = False
+        self.__shift_down = False
         self.__esc = False
         self.__control_left_down = False
+        self.__left_click = False
         self.__init = False
         self.__f4_pressed = False
         self.domain = None
@@ -34,9 +37,16 @@ class EventCore(IEventCore):
     def __event_callback__(self, proxy, event_type, event, refcon):
         flags = Quartz.CGEventGetFlags(event)
         ctrl = Quartz.kCGEventFlagMaskControl
+        alt = Quartz.kCGEventFlagMaskAlternate
+        shift = Quartz.kCGEventFlagMaskShift
+
+        self.__control_down = bool(flags & ctrl)
+        self.__alt_down = bool(flags & alt)
+        self.__shift_down = bool(flags & shift)
 
         # 鼠标左键按下 + Ctrl → is_focus
         if event_type == Quartz.kCGEventLeftMouseDown:
+            self.__left_click = True
             if flags & ctrl:
                 self.__control_left_down = True
                 return None  # 拦截，不传给目标应用
@@ -45,20 +55,15 @@ class EventCore(IEventCore):
         # 键盘按下
         if event_type == Quartz.kCGEventKeyDown:
             keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
-            # kVK_Escape = 53, kVK_F4 = 118, kVK_Control = 59
+            # kVK_Escape = 53, kVK_F4 = 118
             if keycode == 53:  # ESC
                 self.__esc = True
             elif keycode == 118:  # F4
                 self.__f4_pressed = True
-            elif keycode == 59:  # Left Control
-                self.__control_down = True
             return event
 
         # 键盘释放
         if event_type == Quartz.kCGEventKeyUp:
-            keycode = Quartz.CGEventGetIntegerValueField(event, Quartz.kCGKeyboardEventKeycode)
-            if keycode == 59:  # Left Control
-                self.__control_down = False
             return event
 
         return event
@@ -132,7 +137,10 @@ class EventCore(IEventCore):
         logger.info("EventCore start")
         self.__init = False
         self.__control_down = False
+        self.__alt_down = False
+        self.__shift_down = False
         self.__control_left_down = False
+        self.__left_click = False
         self.__esc = False
         self.__f4_pressed = False
         self.__closed = False
@@ -152,7 +160,10 @@ class EventCore(IEventCore):
         logger.info("EventCore close")
         self.__un_hook__()
         self.__control_down = False
+        self.__alt_down = False
+        self.__shift_down = False
         self.__control_left_down = False
+        self.__left_click = False
         self.__esc = False
         self.__f4_pressed = False
         self.__closed = True
@@ -173,3 +184,18 @@ class EventCore(IEventCore):
 
     def reset_cancel_flag(self):
         self.__esc = False
+
+    def is_ctrl_pressed(self) -> bool:
+        return self.__control_down
+
+    def is_alt_pressed(self) -> bool:
+        return self.__alt_down
+
+    def is_shift_pressed(self) -> bool:
+        return self.__shift_down
+
+    def is_left_click(self) -> bool:
+        return self.__left_click
+
+    def reset_left_click_flag(self):
+        self.__left_click = False
