@@ -1,8 +1,10 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { windowManager } from '@/platform'
-import { PickShortCuts, PickMode, PickStep, ShortCutKey, MessageType, HighlightRect } from '../config'
+import { PickShortCuts, PickMode, PickStep, ShortCutKey } from '../config'
 import { RpaHighlight } from '@/api/highlight'
 import { message } from 'ant-design-vue'
+import type { HighlightRect, MessageType } from '../types.d'
+import { currentLocale, t } from '../locale'
 
 
 
@@ -39,9 +41,9 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
   const shortcuts = computed(() => {
     const pickKey = pickMode.value === PickMode.CV ? (pickMode.value + pickStep.value) as PickMode : pickMode.value
     console.log('pickKey: ', pickKey);
-    const shortCuts = PickShortCuts[pickKey]
+    const shortCuts = PickShortCuts.value[pickKey]
     console.log('shortCuts: ', shortCuts);
-    return PickShortCuts[pickKey] || []
+    return PickShortCuts.value[pickKey] || []
   })
 
   const highlightShow = computed(() => {
@@ -178,6 +180,7 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
       case 'start':
         windowManager.showWindow()
         if (data.Type) pickMode.value = data.Type
+        // if (data.Language) currentLocale.value = data.Language as any
         console.log('start: ', data);
         tooltipVisible.value = data.Type !== PickMode.VALIDATE
         break
@@ -233,7 +236,7 @@ export function useHighlight(cvMessageHandler?: (data: any) => void) {
       hideAll()
     })
     RpaHighlight.bindError(() => {
-      message.error('Highlight WebSocket is unavailable')
+      message.error(t('wsUnavailable'))
     })
   })
   onUnmounted(() => {

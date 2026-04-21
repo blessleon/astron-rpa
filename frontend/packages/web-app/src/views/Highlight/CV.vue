@@ -3,7 +3,8 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue'
 import { windowManager, utilsManager } from '@/platform'
-import { DrawRect } from './config'
+import { DrawRect } from './types.d'
+import { t } from './locale'
 
 const props = defineProps<{
   cvStep: string
@@ -241,18 +242,18 @@ onMounted(async () => {
 
     <!-- cv_alt 模式：保存 / 重新选择 -->
     <div v-if="hasAltSelection" class="cv-action-bar" :style="actionBarStyle">
-      <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="reselectAlt">重新选择</button>
-      <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="confirmAltSelection">保存</button>
+      <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="reselectAlt">{{ t('reselect') }}</button>
+      <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="confirmAltSelection">{{ t('save') }}</button>
     </div>
 
     <!-- cv_ctrl 模式：取消 / 保存 -->
     <div v-else-if="hasSelection && !isSelecting" class="cv-action-bar" :style="actionBarStyle">
-      <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="cancelSelection">取消</button>
-      <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="saveSelection">保存</button>
+      <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="cancelSelection">{{ t('cancel') }}</button>
+      <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="saveSelection">{{ t('save') }}</button>
     </div>
 
     <!-- 提示信息 -->
-    <div v-else-if="!hasSelection && !isSelecting && !isCvAltMode" class="cv-tip">拖动鼠标框选目标区域</div>
+    <div v-else-if="!hasSelection && !isSelecting && !isCvAltMode" class="cv-tip">{{ t('dragToSelect') }}</div>
   </div>
 </template>
 

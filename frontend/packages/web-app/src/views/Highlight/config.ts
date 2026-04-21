@@ -1,3 +1,6 @@
+import { computed } from 'vue'
+import { t } from './locale'
+
 export enum PickMode {
   "" = 'normal',
   NORMAL = 'normal',
@@ -26,77 +29,52 @@ export enum ShortCutKey {
   ESC = 'esc',
 }
 
-export const PickTip = {
-  [PickMode.NORMAL]: '元素拾取',
-  [PickMode.SMART]: '智能识别',
-  [PickMode.CV]: 'CV识别',
-  [PickMode.WINDOW]: '窗口拾取',
-  [PickMode.ELEMENT]: '元素拾取',
-  [PickMode.POINT]: '坐标拾取',
-  [PickMode.SIMILAR]: '相似元素拾取',
-  [PickMode.BATCH]: '批量抓取',
-}
+export const PickTip = computed(() => ({
+  [PickMode.NORMAL]: t('elementPick'),
+  [PickMode.SMART]: t('smartRecognition'),
+  [PickMode.CV]: t('cvRecognition'),
+  [PickMode.WINDOW]: t('windowPick'),
+  [PickMode.ELEMENT]: t('elementPick'),
+  [PickMode.POINT]: t('coordinatePick'),
+  [PickMode.SIMILAR]: t('similarElementPick'),
+  [PickMode.BATCH]: t('batchCapture'),
+}))
 
-const defaultShortCuts = [
-  {
-    title: "捕获元素",
-    keys: 'Ctrl + 鼠标左键',
-  },
-  {
-    title: "退出",
-    keys: 'Esc',
+export const PickShortCuts = computed(() => {
+  const defaultShortCuts = [
+    { title: t('captureElement'), keys: t('mouseLeft') },
+    { title: t('exit'), keys: 'Esc' },
+  ]
+
+  const cvShortCuts = [
+    { title: t('screenshotPick'), keys: 'Ctrl' },
+    { title: t('smartPick'), keys: 'Alt' },
+    { title: t('exit'), keys: 'Esc' },
+  ]
+
+  const cvCtrlShortCuts = [
+    { title: t('returnPrevious'), keys: 'Shift' },
+    { title: t('exit'), keys: 'Esc' },
+  ]
+
+  const cvAltShortCuts = [
+    { title: t('returnPrevious'), keys: 'Shift' },
+    { title: t('exit'), keys: 'Esc' },
+  ]
+
+  return {
+    [PickMode.NORMAL]: defaultShortCuts,
+    [PickMode.SMART]: defaultShortCuts,
+    [PickMode.CV]: cvShortCuts,
+    [PickMode.CV + PickStep.CV_CTRL]: cvCtrlShortCuts,
+    [PickMode.CV + PickStep.CV_ALT]: cvAltShortCuts,
+    [PickMode.WINDOW]: defaultShortCuts,
+    [PickMode.ELEMENT]: defaultShortCuts,
+    [PickMode.POINT]: defaultShortCuts,
+    [PickMode.SIMILAR]: defaultShortCuts,
+    [PickMode.BATCH]: defaultShortCuts,
   }
-]
-
-const cvShortCuts = [
-  {
-    title: "截图拾取",
-    keys: 'Ctrl',
-  },
-  {
-    title: "智能拾取",
-    keys: 'Alt',
-  },
-  {
-    title: "退出",
-    keys: 'Esc',
-  }
-]
-
-const cvCtrlShortCuts = [
-  {
-    title: "返回上层",
-    keys: 'Shift',
-  },
-  {
-    title: "退出",
-    keys: 'Esc',
-  }
-]
-
-const cvAltShortCuts = [
-  {
-    title: "返回上层",
-    keys: 'Shift',
-  },
-  {
-    title: "退出",
-    keys: 'Esc',
-  }
-]
-
-export const PickShortCuts = {
-  [PickMode.NORMAL]: defaultShortCuts,
-  [PickMode.SMART]: defaultShortCuts,
-  [PickMode.CV]: cvShortCuts,
-  [PickMode.CV + PickStep.CV_CTRL]: cvCtrlShortCuts,
-  [PickMode.CV + PickStep.CV_ALT]: cvAltShortCuts,
-  [PickMode.WINDOW]: defaultShortCuts,
-  [PickMode.ELEMENT]: defaultShortCuts,
-  [PickMode.POINT]: defaultShortCuts,
-  [PickMode.SIMILAR]: defaultShortCuts,
-  [PickMode.BATCH]: defaultShortCuts,
-}
+})
 
 export const TipPosition = {
   leftTop: {
@@ -107,30 +85,4 @@ export const TipPosition = {
     bottom: '60px',
     right: '10px',
   }
-}
-
-
-export interface HighlightRect {
-  x: number
-  y: number
-  width: number
-  height: number
-  tag?: string
-}
-
-export interface DrawRect {
-  Left: number
-  Top: number
-  Right: number
-  Bottom: number
-  Msg?: string
-}
-
-export interface MessageType {
-  MouseX?: number
-  MouseY?: number
-  Boxes?: DrawRect[],
-  Type?: PickMode,
-  Operation: string,
-  ShortcutKey?: ShortCutKey,
 }

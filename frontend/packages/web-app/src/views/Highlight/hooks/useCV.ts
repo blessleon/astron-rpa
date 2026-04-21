@@ -1,8 +1,7 @@
 
 import { ref, computed } from 'vue'
 import { RpaHighlight } from '@/api/highlight'
-import { DrawRect, HighlightRect } from '../config'
-import { message } from 'ant-design-vue'
+import { DrawRect, HighlightRect } from '../types.d'
 
 type CvPickEvent = 'target_ready' | 'mouse_move' | 'click_confirm' | ''
 

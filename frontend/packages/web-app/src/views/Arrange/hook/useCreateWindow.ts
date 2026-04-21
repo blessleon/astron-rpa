@@ -73,7 +73,7 @@ export function useCreateWindow() {
       fileDropEnabled: false,
       maximizable: false,
       transparent: true,
-      skipTaskbar: true,
+      // skipTaskbar: true,
       fullscreen: true,
       hasShadow: false,            // 无阴影
       movable: false,              // 不可移动

@@ -6,6 +6,7 @@ import { useHighlight } from './hooks/useHighlight'
 import { useCV } from './hooks/useCV'
 import CV from './CV.vue'
 import { PickMode } from './config'
+import { currentLocale, t } from './locale'
 
 const { targetRect, confirmCvCtrlPick, confirmCvAltPick, sendScreenshot, reCvAltPick, handleMessage: handleCvMessage } = useCV()
 
@@ -19,7 +20,7 @@ const {
   shortcuts,
   cvCropShow,
   pickStep,
-  setPickStep
+  setPickStep,
 } = useHighlight(handleCvMessage)
 
 </script>
@@ -41,17 +42,17 @@ const {
       <div v-if="tooltipVisible" :class="`tooltip bg-bg-elevated ${tooltipPos === 'leftTop' ? 'tooltip-left-top' : 'tooltip-right-bottom'}`">
         <!-- <div class="tooltip-item font-bold">{{ modeTitle }}</div> -->
         <div class="tooltip-item font-bold" v-for="(sc, i) in shortcuts" :key="i">
-          <span class="short-title">{{ sc.title }}</span>
+          <span :class="`short-title ${currentLocale === 'en_US' ? 'short-title-en':''}`" >{{ sc.title }}</span>
           <span class="short-keys">{{ sc.keys }}</span>
         </div>
         <div class="tooltip-item">
-          <span class="short-title">位置</span>
-          <span class="short-">{{ mousePos.x }}, {{ mousePos.y }}</span>
+          <span :class="`short-title ${currentLocale === 'en_US' ? 'short-title-en':''}`">{{ t('position') }}</span>
+          <span class="short-xy">{{ mousePos.x }},{{ mousePos.y }}</span>
         </div>
-        <div class="tooltip-item" v-if="appName">
-          <span class="short-title">应用</span>
+        <!-- <div class="tooltip-item" v-if="appName">
+          <span class="short-title">{{ t('application') }}</span>
           <span class="short-">{{ appName }}</span>
-        </div>
+        </div> -->
       </div>
     </div>
 </template>
@@ -133,6 +134,7 @@ const {
   line-height: 1.5;
   pointer-events: none;
   border: 1px var(--color-border) solid;
+  width: 190px;
 
   &-left-top {
     top: 10px;
@@ -156,6 +158,11 @@ const {
     .short-title {
       margin-right: 6px;
       width: 58px;
+      display: inline-block;
+    }
+    .short-title-en {
+      margin-right: 6px;
+      width: 128px;
       display: inline-block;
     }
 
