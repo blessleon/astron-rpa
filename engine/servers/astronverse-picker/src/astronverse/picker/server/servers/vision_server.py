@@ -111,6 +111,16 @@ class VisionServer:
                 logger.info(f"VisionServer _start_session cleared_feedback action={action.value} cleared={cleared}")
 
             data = sign[action.value]
+            if data is None:
+                # 防御：并发窗口或异常请求可能导致 payload 为空，避免启动空线程并给调用方明确结果。
+                logger.warning(
+                    f"VisionServer _start_session skipped action={action.value} "
+                    f"reason=empty_payload sign_has_key={action.value in sign}"
+                )
+                if action.value in sign:
+                    del sign[action.value]
+                    sign[f"{action.value}_RES"] = self._error("invalid_payload")
+                return
             self._session_seq += 1
             session_id = f"{action.value}-{self._session_seq}"
             self._current_session_id = session_id
@@ -326,20 +336,26 @@ class VisionServer:
                         f"VisionServer _run_start ctrl_box session={self._current_session_id} "
                         f"box={self._box_summary(box)} width={r - l} height={b - t}"
                     )
-                    desktop_image = None
                     screenshot_started = time.time()
-                    target_img = pyautogui.screenshot(region=(l, t, r - l, b - t))
+                    desktop_image = pyautogui.screenshot()
                     logger.info(
                         f"VisionServer _run_start ctrl_capture_done session={self._current_session_id} "
                         f"elapsed={time.time() - screenshot_started:.3f} "
-                        f"size={getattr(target_img, 'width', None)}x{getattr(target_img, 'height', None)}"
+                        f"size={getattr(desktop_image, 'width', None)}x{getattr(desktop_image, 'height', None)}"
                     )
-                    logger.info(f"VisionServer _run_start ctrl_pickcore_ready session={self._current_session_id}")
-                    json_res_started = time.time()
-                    pick_result = PickCore.json_res(target_img, target_rect_ltrb, None, None, desktop_image)
+                    logger.info(f"VisionServer _run_start ctrl_check_target_begin session={self._current_session_id}")
+                    check_target_started = time.time()
+                    # 与原 vision-picker 行为对齐：
+                    # ctrl 模式确认后也需要做目标唯一性校验，不唯一时自动补锚点。
+                    pick_result = self._check_target(
+                        target_rect_ltrb=target_rect_ltrb,
+                        desktop_image=desktop_image,
+                        bboxes=None,
+                        partial_rect=(0, 0, desktop_image.width, desktop_image.height),
+                    )
                     logger.info(
-                        f"VisionServer _run_start ctrl_json_res_done session={self._current_session_id} "
-                        f"elapsed={time.time() - json_res_started:.3f} has_result={bool(pick_result)}"
+                        f"VisionServer _run_start ctrl_check_target_done session={self._current_session_id} "
+                        f"elapsed={time.time() - check_target_started:.3f} has_result={bool(pick_result)}"
                     )
                     hl.hide_sync()
                     logger.info(f"VisionServer _run_start ctrl_hide_done session={self._current_session_id}")
@@ -556,14 +572,32 @@ class VisionServer:
         import json
         try:
             logger.info(f"VisionServer _run_validate begin session={self._current_session_id}")
+            if not isinstance(data, dict):
+                logger.warning(
+                    f"VisionServer _run_validate invalid_data session={self._current_session_id} "
+                    f"type={type(data).__name__} value={data}"
+                )
+                return self._error("validate_failed")
             # data 是原始请求消息，cv 数据在 data["data"] 字段中（JSON 字符串）
             cv_data = data.get("data")
+            if cv_data is None:
+                logger.warning(
+                    f"VisionServer _run_validate empty_cv_data session={self._current_session_id} "
+                    f"keys={list(data.keys())}"
+                )
+                return self._error("validate_failed")
             logger.info(
                 f"VisionServer _run_validate raw_input session={self._current_session_id} "
                 f"input_type={type(cv_data).__name__} input_preview={str(cv_data)[:500]}"
             )
             if isinstance(cv_data, str):
                 cv_data = json.loads(cv_data)
+            if not isinstance(cv_data, dict):
+                logger.warning(
+                    f"VisionServer _run_validate parsed_invalid session={self._current_session_id} "
+                    f"type={type(cv_data).__name__}"
+                )
+                return self._error("validate_failed")
             logger.info(
                 f"VisionServer _run_validate parsed_input session={self._current_session_id} "
                 f"keys={list(cv_data.keys()) if isinstance(cv_data, dict) else type(cv_data).__name__} "
@@ -579,6 +613,15 @@ class VisionServer:
                 f"match_box={match_box}"
             )
             if match_box:
+                # 对齐常规拾取校验：命中后向 hl 发送 validate 高亮并停留 3 秒。
+                from astronverse.picker import Rect
+
+                x, y, w, h = match_box
+                rect = Rect(x, y, x + w, y + h)
+                hl = self.svc.ws_server.hl
+                hl.start_sync("validate")
+                hl.draw_sync(rect, "", "validate")
+                time.sleep(3)
                 return self._success("校验成功")
             return self._error("validate_not_found")
         except Exception as e:
