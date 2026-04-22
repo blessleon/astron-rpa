@@ -452,11 +452,8 @@ class VisionServer:
                         )
                         if wait_result == "timeout":
                             return "timeout"
-                        if wait_result == "cancel":
-                            return "cancel"
-                        if wait_result == "shift":
-                            return "shift"
                         if wait_result == "continue":
+                            event_core.reset_left_click_flag()
                             continue
                         if wait_result is not None:
                             return wait_result
@@ -571,6 +568,7 @@ class VisionServer:
                             f"result={wait_result}"
                         )
                         if wait_result == "continue":
+                            event_core.reset_left_click_flag()
                             continue
                         if wait_result is not None:
                             return wait_result
