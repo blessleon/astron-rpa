@@ -1,11 +1,11 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { windowManager } from '@/platform'
-import { PickShortCuts, PickMode, PickStep, ShortCutKey, HighlightRect, MessageType, DrawRect } from '../config'
+import { PickShortCuts, PickMode, PickStep, ShortCutKey, HighlightRect, MessageType, DrawRect, CvPickEvent, PickEvent } from '../config'
 import { RpaHighlight } from '@/api/highlight'
 import { currentLocale } from '../locale'
 import { captureScreen } from '../utils'
 
-type CvPickEvent = 'target_ready' | 'mouse_move' | 'click_confirm' | ''
+
 
 export function useHighlight() {
   const highlightBox = ref<HTMLDivElement | null>(null)
@@ -14,6 +14,7 @@ export function useHighlight() {
   const mousePos = ref({ x: 0, y: 0 })
   const pickMode = ref('' as PickMode)
   const pickStep = ref('' as PickStep)
+  const pickEvent = ref('' as PickEvent)
   const appName = ref('')
   const tooltipVisible = ref(false)
   let tooltipLastPos = 'leftTop'
@@ -24,11 +25,10 @@ export function useHighlight() {
   const targetButton = ref(false)
   const anchorRect = ref<HighlightRect | null>(null)
   const cvPickEvent = ref<CvPickEvent>('')
-  const screenshotDataUrl = ref('')
 
   // tooltip位置根据鼠标位置动态调整，避免遮挡
   const tooltipPos = computed(() => {
-    const margin = 300
+    const margin = 350
     const mouse = mousePos.value
     if (mouse.x < margin && mouse.y < margin) {
       tooltipLastPos = 'rightBottom'
@@ -58,11 +58,7 @@ export function useHighlight() {
   // CV模式下的截图预览是否显示
   const cvCropShow = computed(() => {
     if (pickMode.value === PickMode.DESIGNATE && pickStep.value === PickStep.ALT) return true
-    return [PickStep.CTRL, PickStep.ALT].includes(pickStep.value) && pickMode.value === PickMode.VISION
-  })
-  // targetRect 高亮是否显示（DESIGNATE 模式下，非 ALT 步骤时显示）
-  const targetRectShow = computed(() => {
-    return !!targetRect.value
+    return [PickStep.CTRL, PickStep.ALT, PickStep.ANCHOR].includes(pickStep.value) && pickMode.value === PickMode.VISION
   })
 
   // CV computed
@@ -88,6 +84,7 @@ export function useHighlight() {
     canDraw = true
     tooltipVisible.value = false
     highlightRects.value = []
+    targetButton.value = false
     setPickStep(PickStep.DEFAULT)
   }
 
@@ -96,6 +93,7 @@ export function useHighlight() {
     targetRect.value = null
     anchorRect.value = null
     cvPickEvent.value = ''
+    targetButton.value = false
     canDraw = true
   }
 
@@ -127,16 +125,7 @@ export function useHighlight() {
     sendFeedback('screenshot', { image: imageBase64 })
   }
 
-  const confirmCvAltPick = (params) => {
-    const pos =  {
-      Left: Math.floor(params.x * dpr),
-      Top: Math.floor(params.y * dpr),
-      Right: Math.floor((params.x + params.width) * dpr),
-      Bottom: Math.floor((params.y + params.height) * dpr),
-    }
-    sendFeedback('confirm', { Boxes: [pos] })
-    resetCV()
-  }
+
 
   const confirmCvCtrlPick = (params: { imageDataUrl: string, position: HighlightRect }) => {
     const data = params.position
@@ -149,16 +138,44 @@ export function useHighlight() {
     sendFeedback('confirm', { Boxes: [pos] })
   }
 
+  const confirmCvAltPick = (params) => {
+    const pos = {
+      Left: Math.floor(params.x * dpr),
+      Top: Math.floor(params.y * dpr),
+      Right: Math.floor((params.x + params.width) * dpr),
+      Bottom: Math.floor((params.y + params.height) * dpr),
+    }
+    sendFeedback('confirm', { Boxes: [pos] })
+    resetCV()
+  }
+
   const reCvAltPick = () => {
-    console.log('reCvAltPick: ');
     canDraw = true
     targetButton.value = false
     sendFeedback('continue')
     setPickStep(PickStep.ALT)
   }
 
+  const confirmCvAnchorPick = (params) => {
+    const pos = {
+      Left: Math.floor(params.x * dpr),
+      Top: Math.floor(params.y * dpr),
+      Right: Math.floor((params.x + params.width) * dpr),
+      Bottom: Math.floor((params.y + params.height) * dpr),
+    }
+    sendFeedback('confirm', { Boxes: [pos] })
+    resetCV()
+  }
+
+  const reCvAnchorPick = () => {
+    canDraw = true
+    targetButton.value = false
+    sendFeedback('continue')
+    setPickStep(PickStep.ANCHOR)
+  }
+
   const captureDone = () => {
-    tooltipVisible.value = true
+    tooltipVisible.value = [PickStep.CTRL, PickStep.ALT].includes(pickStep.value)
   }
 
   // 处理快捷键，CV模式下Ctrl/Alt切换截图/智能识别，Shift返回上一步
@@ -208,12 +225,12 @@ export function useHighlight() {
         windowManager.setWindowAlwaysOnTop(true)
         if (data.Type) pickMode.value = data.Type
         if (data.Language) currentLocale.value = data.Language as any
-        tooltipVisible.value = data.Type !== PickMode.VALIDATE
+        tooltipVisible.value = data.Type !== PickMode.VALIDATE || data.mode !== "designate"
         windowManager.setMouseIgnore(pickMode.value !== PickMode.VISION)
         if (data.mode === "designate" && pickMode.value === PickMode.VISION) {
-            captureScreen().then(dataUrl => {
-              sendScreenshot(dataUrl)
-            })
+          captureScreen().then(dataUrl => {
+            sendScreenshot(dataUrl)
+          })
         }
         break
       case 'hide':
@@ -221,20 +238,33 @@ export function useHighlight() {
         hideAll()
         break
       case 'draw':
+        // alt click draw, anchor draw
         if (data.Type === PickMode.DESIGNATE) {
           targetRect.value = handleRect(data.TargetRect)
-          targetButton.value = true
+          targetButton.value = data.Event === PickEvent.CLICK_CONFIRM
+          pickEvent.value = data.Event
+          if (data.Event === PickEvent.TARGET_READY) {
+            setPickStep(PickStep.ANCHOR)
+          }
+          if (data.Event === PickEvent.MOUSE_MOVE && data.AnchorRect) {
+            anchorRect.value = handleRect(data.AnchorRect)
+            tooltipVisible.value = false
+          }
+          if (data.Event === PickEvent.CLICK_CONFIRM && data.AnchorRect) {
+            targetButton.value = true
+          }
           return
         }
+
         if (canDraw) {
+          // alt draw move
           if (data.Type === PickMode.VISION_PICK) {
             targetButton.value = false
             targetRect.value = data.Boxes?.[0] ? handleRect(data.Boxes[0]) : null
             return
           }
-          if (canDraw) {
-            handleDraw(data)
-          }
+          // draw default
+          handleDraw(data)
         }
         windowManager.setWindowAlwaysOnTop(true)
         break
@@ -286,7 +316,6 @@ export function useHighlight() {
     setPickStep,
     // CV
     targetRect,
-    targetRectShow,
     targetButton,
     anchorRect,
     cvPickEvent,
@@ -302,5 +331,7 @@ export function useHighlight() {
     confirmCvCtrlPick,
     resetCV,
     captureDone,
+    reCvAnchorPick,
+    confirmCvAnchorPick
   }
 }

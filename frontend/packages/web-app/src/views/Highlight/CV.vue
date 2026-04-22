@@ -10,12 +10,12 @@ import { PickStep, PickMode, HighlightRect } from './config';
 const props = defineProps<{
   cvStep: string
   targetRect?: HighlightRect | null
-  targetRectShow?: boolean
+  anchorRect?: HighlightRect | null
   targetButton?: boolean
   pickMode?: string
 }>()
 // ─── Emits ───────────────────────────────────────────────────────────────────
-const emit = defineEmits(['save', 'confirmAlt', 'reselectAlt', 'sendScreenshot', 'captureDone'])
+const emit = defineEmits(['save', 'confirmAlt', 'reselectAlt', 'sendScreenshot', 'captureDone', 'reselectAnchor', 'confirmCvAnchorPick'])
 
 // ─── Screenshot state ────────────────────────────────────────────────────────
 const screenshotDataUrl = ref<string>('')
@@ -29,9 +29,12 @@ const hasSelection = ref(false)
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const dpr = window.devicePixelRatio || 1
-
+// PickStep.CTRL 模式
+const isCvCtrlMode = computed(() => props.cvStep === PickStep.CTRL)
 // PickStep.ALT 模式：显示智能拾取的高亮位置
 const isCvAltMode = computed(() => props.cvStep === PickStep.ALT)
+//
+const isCvAnchorMode = computed(() => props.cvStep === PickStep.ANCHOR)
 // PickStep.ALT 模式下，有 targetRect 即视为有选区
 const hasAltSelection = computed(() => isCvAltMode.value && !!props.targetRect)
 
@@ -114,6 +117,37 @@ const actionBarStyle = computed(() => {
   }
 })
 
+const anchorAtionBarStyle = computed(() => {
+  const sel = props.anchorRect
+  const barHeight = 36
+  const margin = 8
+  const preferTop = sel.y + sel.height + margin
+  const fallbackTop = sel.y - barHeight - margin
+  const top = preferTop + barHeight <= window.innerHeight ? preferTop : Math.max(0, fallbackTop)
+
+  const isNearLeftEdge = sel.x + sel.width + margin < 150
+  if (isNearLeftEdge) {
+    return {
+      left: `${Math.max(0, sel.x)}px`,
+      top: `${top}px`,
+    }
+  }
+
+  return {
+    left: `${sel.x + sel.width}px`,
+    top: `${top}px`,
+    transform: 'translateX(-100%)',
+  }
+})
+
+const anchorTagPosition = computed(() => {
+  return props.anchorRect && props.anchorRect.y > 60 ? 'top' : 'bottom'
+})
+
+const targetTagPosition = computed(() => {
+  return props.targetRect && props.targetRect.y < 60 ? 'bottom' : 'top'
+})
+
 // ─── Mouse event handlers ─────────────────────────────────────────────────────
 function onMouseDown(e: MouseEvent) {
   // PickStep.ALT 模式下禁用手动选择
@@ -159,15 +193,16 @@ function saveSelection() {
   const img = new Image()
   img.src = screenshotDataUrl.value
   img.onload = async () => {
+    const gap = 2 * dpr
     const sel = selection.value
     // 用图片自然像素与视口的实际比值换算，比直接使用 dpr 更精确
     // 避免 Electron 窗口缩放或 display.scaleFactor 与 window.devicePixelRatio 的细微差异导致模糊
     const scaleX = img.naturalWidth / window.innerWidth
     const scaleY = img.naturalHeight / window.innerHeight
-    const srcX = Math.round(sel.x * scaleX)
-    const srcY = Math.round(sel.y * scaleY)
-    const srcW = Math.round(sel.width * scaleX)
-    const srcH = Math.round(sel.height * scaleY)
+    const srcX = Math.round(sel.x * scaleX) + 2
+    const srcY = Math.round(sel.y * scaleY) + 2
+    const srcW = Math.round(sel.width * scaleX) - 4 // -4是为了消除边框
+    const srcH = Math.round(sel.height * scaleY) - 4
     const canvas = document.createElement('canvas')
     canvas.width = srcW
     canvas.height = srcH
@@ -177,7 +212,7 @@ function saveSelection() {
 
     emit('save', {
       imageDataUrl,
-      position: { x: sel.x, y: sel.y, width: sel.width, height: sel.height },
+      position: { x: sel.x + gap, y: sel.y + gap, width: sel.width - gap*2, height: sel.height - gap*2 },
     })
   }
 }
@@ -189,6 +224,14 @@ function confirmAltSelection() {
 
 function reselectAlt() {
   emit('reselectAlt')
+}
+
+function reAnchorPick() {
+  emit('reselectAnchor')
+}
+
+function confirmAnchorPick() {
+  emit('confirmCvAnchorPick', props.anchorRect)
 }
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
@@ -225,7 +268,7 @@ onMounted(async () => {
 
     <div v-if="isCvAltMode">
       <div
-        v-if="targetRectShow"
+        v-if="!!targetRect"
         class="highlight-box target-rect-highlight"
         :style="{
           transform: `translate(${targetRect!.x}px, ${targetRect!.y}px)`,
@@ -238,7 +281,7 @@ onMounted(async () => {
         <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="confirmAltSelection">{{ t('save') }}</button>
       </div>
     </div>
-    <div v-else>
+    <div v-if="isCvCtrlMode">
       <!-- 无选区时：整屏黑色半透明遮罩 -->
       <div v-if="!isSelecting && !hasSelection" class="cv-overlay cv-overlay--full" />
 
@@ -265,6 +308,38 @@ onMounted(async () => {
       </div>
       <!-- 提示信息 -->
       <div v-else-if="!hasSelection && !isSelecting" class="cv-tip">{{ t('dragToSelect') }}</div>
+    </div>
+    <div v-if="isCvAnchorMode">
+      <div
+        v-if="!!targetRect"
+        class="highlight-box target-rect-highlight"
+        :style="{
+          transform: `translate(${targetRect!.x}px, ${targetRect!.y}px)`,
+          width: targetRect!.width + 'px',
+          height: targetRect!.height + 'px',
+        }">
+        <div :class="`highlight-tag highlight-tag-${targetTagPosition} cv-anchor-tag`">
+          <img class="highlight-tag-img" src="@/assets/img/pick/target.jpg" />
+          {{ t('targetElement') }}
+        </div>
+      </div>
+      <div
+        v-if="!!anchorRect"
+        class="highlight-box cv-anchor-box target-rect-highlight"
+        :style="{
+          transform: `translate(${anchorRect!.x}px, ${anchorRect!.y}px)`,
+          width: anchorRect!.width + 'px',
+          height: anchorRect!.height + 'px',
+        }">
+        <div :class="`highlight-tag highlight-tag-${anchorTagPosition} cv-anchor-tag`">
+          <img class="highlight-tag-img" src="@/assets/img/pick/anchor.jpg" />
+          {{ t('anchorElement') }}
+        </div>
+      </div>
+      <div v-if="targetButton" class="cv-action-bar" :style="anchorAtionBarStyle">
+        <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="reAnchorPick">{{ t('reselect') }}</button>
+        <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="confirmAnchorPick">{{ t('save') }}</button>
+      </div>
     </div>
   </div>
 </template>
@@ -338,7 +413,7 @@ onMounted(async () => {
   position: absolute;
   width: 8px;
   height: 8px;
-  border-color: #fff;
+  border-color: #1677ff;
   border-style: solid;
   background: transparent;
 
@@ -382,12 +457,12 @@ onMounted(async () => {
   outline: none;
 
   &--cancel {
-    background: rgba(177, 177, 177, 0.8);
+    background: rgba(177, 177, 177, 1);
     color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.5);
 
     &:hover {
-      background: rgba(177, 177, 177, 0.6);
+      background: rgba(190, 190, 190, 1);
     }
   }
 
@@ -422,5 +497,19 @@ onMounted(async () => {
   padding: 4px 12px;
   border-radius: 4px;
   pointer-events: none;
+}
+
+.cv-anchor-box {
+  border: 2px solid #f5a452;
+  background: #f5a4527e;
+}
+.cv-anchor-tag {
+  display: flex;
+  width: max-content;
+}
+.highlight-tag-img{
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
 }
 </style>

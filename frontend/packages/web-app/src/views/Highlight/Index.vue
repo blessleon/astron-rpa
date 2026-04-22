@@ -18,13 +18,15 @@ const {
   pickStep,
   highlightRects,
   targetRect,
-  targetRectShow,
+  anchorRect,
   targetButton,
   confirmCvCtrlPick,
   confirmCvAltPick,
   sendScreenshot,
   reCvAltPick,
   captureDone,
+  reCvAnchorPick,
+  confirmCvAnchorPick,
 } = useHighlight()
 
 </script>
@@ -50,13 +52,15 @@ const {
         v-if="cvCropShow"
         :cvStep="pickStep"
         :targetRect="targetRect"
-        :targetRectShow="targetRectShow"
+        :anchorRect="anchorRect"
         :targetButton="targetButton"
         :pickMode="pickMode"
         @save="confirmCvCtrlPick"
         @confirm-alt="confirmCvAltPick"
         @send-screenshot="sendScreenshot"
         @reselect-alt="reCvAltPick"
+        @reselect-anchor="reCvAnchorPick"
+        @confirm-cv-anchor-pick="confirmCvAnchorPick"
         @capture-done="captureDone"
       />
 
@@ -94,14 +98,14 @@ const {
   z-index: 99999;
   .highlight-tag {
     position: absolute;
-    background: #1c1c1c;
+    background: #111111;
     color: #fff;
     padding: 2px 6px;
     font-size: 12px;
     border-radius: 4px;
     white-space: nowrap;
-   transition: all 0.01s ease-out;
-
+    transition: all 0.01s ease-out;
+    border: 1px solid var(--color-border);
     &-top {
       top: -26px;
       left: -2px;
@@ -173,13 +177,10 @@ const {
 
     .short-title {
       margin-right: 6px;
-      width: 58px;
+      flex: 1;
       display: inline-block;
     }
     .short-title-en {
-      margin-right: 6px;
-      width: 128px;
-      display: inline-block;
     }
 
     .short-keys {

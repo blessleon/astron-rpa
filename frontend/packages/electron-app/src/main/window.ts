@@ -58,6 +58,45 @@ export function createMainWindow() {
   return createWindow(mainWindowOptions, MAIN_WINDOW_LABEL)
 }
 
+function resolvePositionOnDisplay(
+  display: Electron.Display,
+  position: string | undefined,
+  width: number,
+  height: number,
+  offset: number,
+  _x?: number,
+  _y?: number,
+): { x: number | undefined; y: number | undefined; width: number; height: number } {
+  const { x: dx, y: dy, width: sw, height: sh } = display.workArea
+  let x: number | undefined = _x
+  let y: number | undefined = _y
+  let w = width
+  let h = height
+
+  switch (position) {
+    case 'left_top':
+      x = dx + 2; y = dy + 2; break
+    case 'right_top':
+      x = dx + sw - w - 2; y = dy + 2; break
+    case 'left_bottom':
+      x = dx + 2; y = dy + sh - h - 2; break
+    case 'right_bottom':
+      x = dx + sw - w - 2; y = dy + sh - h - 2; break
+    case 'top_center':
+      x = dx + Math.round((sw - w) / 2); y = dy + 2; break
+    case 'center':
+      x = dx + Math.round((sw - w) / 2); y = dy + Math.round((sh - h) / 2); break
+    case 'right_center':
+      x = dx + sw - w - offset; y = dy + Math.round((sh - h) / 2); break
+    case 'fullscreen':
+      x = dx; y = dy; w = sw; h = sh; break
+    default:
+      break
+  }
+
+  return { x, y, width: w, height: h }
+}
+
 export function createSubWindow(options: CreateWindowOptions) {
   logger.info('createSubWindow', JSON.stringify(options))
   let {
@@ -68,53 +107,16 @@ export function createSubWindow(options: CreateWindowOptions) {
     position,
     x: _x,
     y: _y,
+    followCursor,
     ...restOptions
   } = options
 
   const display = screen.getPrimaryDisplay()
-  const { width: screenWidth, height: screenHeight } = display.workAreaSize
-
-  let x: number | undefined = _x
-  let y: number | undefined = _y
-
-  switch (position) {
-    case 'left_top':
-      x = 2
-      y = 2
-      break
-    case 'right_top':
-      x = screenWidth - width - 2
-      y = 2
-      break
-    case 'left_bottom':
-      x = 2
-      y = screenHeight - height - 2
-      break
-    case 'right_bottom':
-      x = screenWidth - width - 2
-      y = screenHeight - height - 2
-      break
-    case 'top_center':
-      x = Math.round((screenWidth - width) / 2)
-      y = 2
-      break
-    case 'center':
-      x = Math.round((screenWidth - width) / 2)
-      y = Math.round((screenHeight - height) / 2)
-      break
-    case 'right_center':
-      x = screenWidth - width - offset
-      y = screenHeight / 2 - height / 2
-      break
-    case 'fullscreen':
-      x = 0
-      y = 0
-      width = screenWidth
-      height = screenHeight
-      break
-    default:
-      break
-  }
+  const resolved = resolvePositionOnDisplay(display, position, width, height, offset, _x, _y)
+  let x: number | undefined = resolved.x
+  let y: number | undefined = resolved.y
+  width = resolved.width
+  height = resolved.height
 
   const subWindowOptions: Electron.BrowserWindowConstructorOptions = {
     ...restOptions,
@@ -136,7 +138,7 @@ export function createSubWindow(options: CreateWindowOptions) {
     window.loadURL(url).then(() => sendElectronInfo(window)).catch(() => logger.error('Failed to load URL'))
   }
   if (options.mouseIgnore) {
-    window.setIgnoreMouseEvents(true, { forward: true });
+    window.setIgnoreMouseEvents(true, { forward: true })
   }
   window.on('ready-to-show', () => {
     if (options?.show !== false) {
@@ -145,12 +147,39 @@ export function createSubWindow(options: CreateWindowOptions) {
     window.focus()
   })
 
+  if (followCursor) {
+    let lastDisplayId: number | null = null
+    const timer = setInterval(() => {
+      if (window.isDestroyed()) {
+        clearInterval(timer)
+        return
+      }
+      const cursor = screen.getCursorScreenPoint()
+      const currentDisplay = screen.getDisplayNearestPoint(cursor)
+      if (currentDisplay.id === lastDisplayId) return
+      lastDisplayId = currentDisplay.id
+      const { x: nx, y: ny, width: nw, height: nh } = resolvePositionOnDisplay(
+        currentDisplay, position, options.width ?? 800, options.height ?? 600, offset,
+      )
+      window.setBounds({
+        x: nx ?? currentDisplay.workArea.x,
+        y: ny ?? currentDisplay.workArea.y,
+        width: nw,
+        height: nh,
+      })
+      logger.info(`followCursor: moved window to display ${currentDisplay.id}`)
+    }, 300)
+
+    window.on('closed', () => clearInterval(timer))
+  }
+
   window.on('closed', () => {
     if (options.label) {
       WindowStack.delete(options.label)
     }
   })
 
-
   return window
 }
+
+

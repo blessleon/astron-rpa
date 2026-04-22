@@ -20,6 +20,7 @@ export enum PickStep {
   CTRL = 'ctrl',
   ALT = 'alt',
   PICKED = 'picked',
+  ANCHOR = 'anchor',
 }
 
 export enum ShortCutKey {
@@ -41,11 +42,13 @@ const cvShortCuts = [
 ]
 
 const cvCtrlShortCuts = [
+  { title: t('cvCtrlTitle'), keys: t('cvCtrlShortcut') },
   { title: t('returnPrevious'), keys: 'Shift' },
   { title: t('exit'), keys: 'Esc' },
 ]
 
 const cvAltShortCuts = [
+  { title: t('cvAltTitle'), keys: t('cvAltShortcut') },
   { title: t('returnPrevious'), keys: 'Shift' },
   { title: t('exit'), keys: 'Esc' },
 ]
@@ -73,6 +76,14 @@ export const TipPosition = {
   }
 }
 
+export enum PickEvent {
+  TARGET_READY = 'target_ready',
+  MOUSE_MOVE = 'mouse_move',
+  CLICK_CONFIRM = 'click_confirm',
+  DEFAULT = ''
+}
+
+export type CvPickEvent = 'target_ready' | 'mouse_move' | 'click_confirm' | ''
 
 export interface HighlightRect {
   x: number
@@ -99,5 +110,7 @@ export interface MessageType {
   ShortcutKey?: ShortCutKey,
   Language?: string,
   TargetRect?: DrawRect,
-  mode: string
+  AnchorRect?: DrawRect,
+  Event?: PickEvent
+  mode?: string
 }

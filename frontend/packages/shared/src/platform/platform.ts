@@ -83,6 +83,7 @@ export interface CreateWindowOptions {
   simpleFullscreen?: boolean
   mouseIgnore?: boolean
   keyboardIgnore?: boolean
+  followCursor?: boolean
 }
 
 // 窗口消息类型

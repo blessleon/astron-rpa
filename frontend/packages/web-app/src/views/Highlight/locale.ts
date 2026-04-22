@@ -24,6 +24,12 @@ export const translations = {
     returnPrevious: '返回上层',
     wsUnavailable: 'Highlight WebSocket 不可用',
     mouseLeft: 'Ctrl + 鼠标左键',
+    targetElement: '目标元素',
+    anchorElement: '锚点元素',
+    cvCtrlTitle: '普通图像拾取',
+    cvCtrlShortcut: '框选区域',
+    cvAltTitle: '智能图像拾取',
+    cvAltShortcut: '点击元素',
   },
   en_US: {
     position: 'Position',
@@ -46,6 +52,12 @@ export const translations = {
     returnPrevious: 'Return',
     wsUnavailable: 'Highlight WebSocket is unavailable',
     mouseLeft: 'Ctrl + Left Click',
+    targetElement: 'Target Element',
+    anchorElement: 'Anchor Element',
+    cvCtrlTitle: 'Normal Image Pick',
+    cvCtrlShortcut: 'Select Area',
+    cvAltTitle: 'Smart Image Pick',
+    cvAltShortcut: 'Click Element',
   },
 }
 
