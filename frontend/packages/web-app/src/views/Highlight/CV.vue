@@ -34,6 +34,12 @@ const isCvAltMode = computed(() => props.cvStep === PickStep.ALT)
 // PickStep.ALT 模式下，有 targetRect 即视为有选区
 const hasAltSelection = computed(() => isCvAltMode.value && !!props.targetRect)
 
+const cvContainerStyle = computed(() => {
+  return {
+    cursor: isCvAltMode.value ? 'default' : 'crosshair'
+  }
+})
+
 const selection = computed(() => {
   // PickStep.ALT 模式：使用后端返回的 targetRect
   if (isCvAltMode.value && props.targetRect) {
@@ -212,7 +218,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="cv-container" @mousedown="onMouseDown" @mousemove="onMouseMove" @mouseup="onMouseUp" @mouseleave="onMouseLeave">
+  <div class="cv-container" :style="cvContainerStyle" @mousedown="onMouseDown" @mousemove="onMouseMove" @mouseup="onMouseUp" @mouseleave="onMouseLeave">
     <!-- 截图作为全屏背景 -->
     <img v-if="screenshotDataUrl" class="cv-screenshot" :src="screenshotDataUrl" draggable="false" alt="" />
 
@@ -224,8 +230,7 @@ onMounted(async () => {
           transform: `translate(${targetRect!.x}px, ${targetRect!.y}px)`,
           width: targetRect!.width + 'px',
           height: targetRect!.height + 'px',
-        }"
-      />
+        }" />
       <!-- PickStep.ALT 模式：保存 / 重新选择 -->
       <div v-if="targetButton" class="cv-action-bar" :style="actionBarStyle">
         <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="reselectAlt">{{ t('reselect') }}</button>
@@ -270,7 +275,7 @@ onMounted(async () => {
   cursor: crosshair;
   user-select: none;
   overflow: hidden;
-  animation: fadeIn ease-in 0.3s forwards;
+  animation: fadeIn ease-in 0.2s forwards;
 }
 
 .cv-screenshot {
@@ -281,7 +286,7 @@ onMounted(async () => {
   object-fit: cover;
   display: block;
   pointer-events: none;
-  animation: fadeIn ease-in 0.2s forwards;
+  animation: fadeIn ease-in 0.1s forwards;
 }
 
 @keyframes fadeIn {

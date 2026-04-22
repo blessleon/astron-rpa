@@ -2,8 +2,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { windowManager } from '@/platform'
 import { PickShortCuts, PickMode, PickStep, ShortCutKey, HighlightRect, MessageType, DrawRect } from '../config'
 import { RpaHighlight } from '@/api/highlight'
-import { message } from 'ant-design-vue'
-import { currentLocale, t } from '../locale'
+import { currentLocale } from '../locale'
 
 type CvPickEvent = 'target_ready' | 'mouse_move' | 'click_confirm' | ''
 
@@ -100,9 +99,9 @@ export function useHighlight() {
 
   // CV feedback
   const sendFeedback = (feedbackType: string, data?: any) => {
-    console.log('feedbackType: ', feedbackType, data);
     const payload: any = { feedback_type: feedbackType }
     if (data !== undefined) payload.data = data
+    console.log('payload: ', payload);
     RpaHighlight.send(payload)
   }
 
@@ -198,25 +197,26 @@ export function useHighlight() {
   }
   // 处理消息
   const handleOperation = (op: string, data: MessageType) => {
+    if (op !== 'mouse_move') {
+      console.log(data)
+    }
     switch (op) {
       case 'start':
-        console.log('handleOperation: ', op, data);
         windowManager.showWindow()
         windowManager.setWindowAlwaysOnTop(true)
         if (data.Type) pickMode.value = data.Type
         if (data.Language) currentLocale.value = data.Language as any
         tooltipVisible.value = data.Type !== PickMode.VALIDATE
-        if (pickMode.value !== PickMode.VISION) {
-          windowManager.setMouseIgnore(true)
-        }
+        windowManager.setMouseIgnore(pickMode.value !== PickMode.VISION)
+        // if (data.mode === "designate" && pickMode.value === PickMode.VISION) {
+        //    tooltipVisible.value = false
+        // }
         break
       case 'hide':
-        console.log('handleOperation: ', op, data);
         highlightRects.value = []
         hideAll()
         break
       case 'draw':
-        console.log('handleOperation: ', op, data);
         if (data.Type === PickMode.DESIGNATE) {
           targetRect.value = handleRect(data.TargetRect)
           targetButton.value = true
