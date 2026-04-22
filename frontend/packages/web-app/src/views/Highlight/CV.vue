@@ -1,11 +1,15 @@
 <!-- @format -->
 
 <script lang="ts" setup>
-import { ref, computed, onMounted } from 'vue'
-import { windowManager, utilsManager } from '@/platform'
-import { captureScreen } from './utils'
+import { message } from 'ant-design-vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
+
+import { windowManager } from '@/platform'
+
+import type { HighlightRect } from './config'
+import { PickMode, PickStep } from './config'
 import { t } from './locale'
-import { PickStep, PickMode, HighlightRect } from './config';
+import { captureScreen } from './utils'
 
 const props = defineProps<{
   cvStep: string
@@ -35,12 +39,10 @@ const isCvCtrlMode = computed(() => props.cvStep === PickStep.CTRL)
 const isCvAltMode = computed(() => props.cvStep === PickStep.ALT)
 //
 const isCvAnchorMode = computed(() => props.cvStep === PickStep.ANCHOR)
-// PickStep.ALT 模式下，有 targetRect 即视为有选区
-const hasAltSelection = computed(() => isCvAltMode.value && !!props.targetRect)
 
 const cvContainerStyle = computed(() => {
   return {
-    cursor: isCvAltMode.value ? 'default' : 'crosshair'
+    cursor: isCvAltMode.value ? 'default' : 'crosshair',
   }
 })
 
@@ -151,10 +153,13 @@ const targetTagPosition = computed(() => {
 // ─── Mouse event handlers ─────────────────────────────────────────────────────
 function onMouseDown(e: MouseEvent) {
   // PickStep.ALT 模式下禁用手动选择
-  if (isCvAltMode.value) return
-  if (e.button !== 0) return
+  if (isCvAltMode.value)
+    return
+  if (e.button !== 0)
+    return
   // 点击按钮区域时不重置选区
-  if ((e.target as HTMLElement).closest('.cv-action-bar')) return
+  if ((e.target as HTMLElement).closest('.cv-action-bar'))
+    return
   isSelecting.value = true
   hasSelection.value = false
   startPos.value = { x: e.clientX, y: e.clientY }
@@ -163,12 +168,14 @@ function onMouseDown(e: MouseEvent) {
 }
 
 function onMouseMove(e: MouseEvent) {
-  if (!isSelecting.value) return
+  if (!isSelecting.value)
+    return
   currentPos.value = { x: e.clientX, y: e.clientY }
 }
 
 function onMouseUp(e: MouseEvent) {
-  if (!isSelecting.value) return
+  if (!isSelecting.value)
+    return
   isSelecting.value = false
   currentPos.value = { x: e.clientX, y: e.clientY }
   if (selection.value.width > 5 && selection.value.height > 5) {
@@ -189,7 +196,8 @@ function cancelSelection() {
 }
 
 function saveSelection() {
-  if (!screenshotDataUrl.value) return
+  if (!screenshotDataUrl.value)
+    return
   const img = new Image()
   img.src = screenshotDataUrl.value
   img.onload = async () => {
@@ -212,7 +220,7 @@ function saveSelection() {
 
     emit('save', {
       imageDataUrl,
-      position: { x: sel.x + gap, y: sel.y + gap, width: sel.width - gap*2, height: sel.height - gap*2 },
+      position: { x: sel.x + gap, y: sel.y + gap, width: sel.width - gap * 2, height: sel.height - gap * 2 },
     })
   }
 }
@@ -237,12 +245,13 @@ function confirmAnchorPick() {
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(async () => {
   windowManager.setWindowAlwaysOnTop(true)
+  isLoading.value = true
   try {
     const dataUrl = await captureScreen()
     if (dataUrl) {
       screenshotDataUrl.value = dataUrl as string
     }
-    emit('captureDone')
+
     if (props.cvStep === PickStep.ALT) {
       // PickStep.ALT 模式下直接显示后端分析的选区，不允许手动选择
       hasSelection.value = false
@@ -253,18 +262,24 @@ onMounted(async () => {
   }
   catch (err) {
     console.error('[CV] Failed to capture screen:', err)
+    message.error(t('screenshotFailed'))
   }
   finally {
     windowManager.showWindow()
-    isLoading.value = false
+    nextTick(() => {
+      setTimeout(() => {
+        isLoading.value = false
+        emit('captureDone')
+      }, 500)
+    })
   }
 })
 </script>
 
 <template>
-  <div class="cv-container" :style="cvContainerStyle" @mousedown="onMouseDown" @mousemove="onMouseMove" @mouseup="onMouseUp" @mouseleave="onMouseLeave">
+  <div v-if="!isLoading" class="cv-container" :style="cvContainerStyle" @mousedown="onMouseDown" @mousemove="onMouseMove" @mouseup="onMouseUp" @mouseleave="onMouseLeave">
     <!-- 截图作为全屏背景 -->
-    <img v-if="screenshotDataUrl" class="cv-screenshot" :src="screenshotDataUrl" draggable="false" alt="" />
+    <img v-if="screenshotDataUrl" class="cv-screenshot" :src="screenshotDataUrl" draggable="false" alt="">
 
     <div v-if="isCvAltMode">
       <div
@@ -272,13 +287,18 @@ onMounted(async () => {
         class="highlight-box target-rect-highlight"
         :style="{
           transform: `translate(${targetRect!.x}px, ${targetRect!.y}px)`,
-          width: targetRect!.width + 'px',
-          height: targetRect!.height + 'px',
-        }" />
+          width: `${targetRect!.width}px`,
+          height: `${targetRect!.height}px`,
+        }"
+      />
       <!-- PickStep.ALT 模式：保存 / 重新选择 -->
       <div v-if="targetButton" class="cv-action-bar" :style="actionBarStyle">
-        <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="reselectAlt">{{ t('reselect') }}</button>
-        <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="confirmAltSelection">{{ t('save') }}</button>
+        <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="reselectAlt">
+          {{ t('reselect') }}
+        </button>
+        <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="confirmAltSelection">
+          {{ t('save') }}
+        </button>
       </div>
     </div>
     <div v-if="isCvCtrlMode">
@@ -303,11 +323,17 @@ onMounted(async () => {
       </div>
       <!-- cv_ctrl 模式：取消 / 保存 -->
       <div v-if="hasSelection && !isSelecting" class="cv-action-bar" :style="actionBarStyle">
-        <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="cancelSelection">{{ t('cancel') }}</button>
-        <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="saveSelection">{{ t('save') }}</button>
+        <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="cancelSelection">
+          {{ t('cancel') }}
+        </button>
+        <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="saveSelection">
+          {{ t('save') }}
+        </button>
       </div>
       <!-- 提示信息 -->
-      <div v-else-if="!hasSelection && !isSelecting" class="cv-tip">{{ t('dragToSelect') }}</div>
+      <div v-else-if="!hasSelection && !isSelecting" class="cv-tip">
+        {{ t('dragToSelect') }}
+      </div>
     </div>
     <div v-if="isCvAnchorMode">
       <div
@@ -315,11 +341,12 @@ onMounted(async () => {
         class="highlight-box target-rect-highlight"
         :style="{
           transform: `translate(${targetRect!.x}px, ${targetRect!.y}px)`,
-          width: targetRect!.width + 'px',
-          height: targetRect!.height + 'px',
-        }">
+          width: `${targetRect!.width}px`,
+          height: `${targetRect!.height}px`,
+        }"
+      >
         <div :class="`highlight-tag highlight-tag-${targetTagPosition} cv-anchor-tag`">
-          <img class="highlight-tag-img" src="@/assets/img/pick/target.jpg" />
+          <img class="highlight-tag-img" src="@/assets/img/pick/target.jpg">
           {{ t('targetElement') }}
         </div>
       </div>
@@ -328,17 +355,22 @@ onMounted(async () => {
         class="highlight-box cv-anchor-box target-rect-highlight"
         :style="{
           transform: `translate(${anchorRect!.x}px, ${anchorRect!.y}px)`,
-          width: anchorRect!.width + 'px',
-          height: anchorRect!.height + 'px',
-        }">
+          width: `${anchorRect!.width}px`,
+          height: `${anchorRect!.height}px`,
+        }"
+      >
         <div :class="`highlight-tag highlight-tag-${anchorTagPosition} cv-anchor-tag`">
-          <img class="highlight-tag-img" src="@/assets/img/pick/anchor.jpg" />
+          <img class="highlight-tag-img" src="@/assets/img/pick/anchor.jpg">
           {{ t('anchorElement') }}
         </div>
       </div>
       <div v-if="targetButton" class="cv-action-bar" :style="anchorAtionBarStyle">
-        <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="reAnchorPick">{{ t('reselect') }}</button>
-        <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="confirmAnchorPick">{{ t('save') }}</button>
+        <button class="cv-btn cv-btn--cancel" @mousedown.stop @click.stop="reAnchorPick">
+          {{ t('reselect') }}
+        </button>
+        <button class="cv-btn cv-btn--save" @mousedown.stop @click.stop="confirmAnchorPick">
+          {{ t('save') }}
+        </button>
       </div>
     </div>
   </div>
@@ -375,7 +407,6 @@ onMounted(async () => {
 }
 
 .cv-overlay {
-
   position: fixed;
   background: rgba(0, 0, 0, 0.4);
   pointer-events: none;
@@ -507,7 +538,7 @@ onMounted(async () => {
   display: flex;
   width: max-content;
 }
-.highlight-tag-img{
+.highlight-tag-img {
   width: 16px;
   height: 16px;
   margin-right: 4px;

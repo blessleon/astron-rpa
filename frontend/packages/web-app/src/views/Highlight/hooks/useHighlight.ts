@@ -1,11 +1,12 @@
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { windowManager } from '@/platform'
-import { PickShortCuts, PickMode, PickStep, ShortCutKey, HighlightRect, MessageType, DrawRect, CvPickEvent, PickEvent } from '../config'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+
 import { RpaHighlight } from '@/api/highlight'
+import { windowManager } from '@/platform'
+
+import type { CvPickEvent, DrawRect, HighlightRect, MessageType } from '../config'
+import { PickEvent, PickMode, PickShortCuts, PickStep, ShortCutKey } from '../config'
 import { currentLocale } from '../locale'
 import { captureScreen } from '../utils'
-
-
 
 export function useHighlight() {
   const highlightBox = ref<HTMLDivElement | null>(null)
@@ -47,7 +48,7 @@ export function useHighlight() {
   const shortcuts = computed(() => {
     const pickKey = pickMode.value === PickMode.VISION ? (pickMode.value + pickStep.value) as PickMode : pickMode.value
     const shortCuts = PickShortCuts[pickKey]
-    console.log('shortCuts: ', shortCuts);
+    console.log('shortCuts: ', shortCuts)
     return shortCuts || []
   })
   // 高亮区域是否显示（CV模式下由CV组件控制）
@@ -57,13 +58,15 @@ export function useHighlight() {
   })
   // CV模式下的截图预览是否显示
   const cvCropShow = computed(() => {
-    if (pickMode.value === PickMode.DESIGNATE && pickStep.value === PickStep.ALT) return true
+    if (pickMode.value === PickMode.DESIGNATE && pickStep.value === PickStep.ALT)
+      return true
     return [PickStep.CTRL, PickStep.ALT, PickStep.ANCHOR].includes(pickStep.value) && pickMode.value === PickMode.VISION
   })
 
   // CV computed
   const toRectStyle = (rect: HighlightRect | null) => {
-    if (!rect) return null
+    if (!rect)
+      return null
     return {
       left: `${rect.x}px`,
       top: `${rect.y}px`,
@@ -100,13 +103,15 @@ export function useHighlight() {
   // CV feedback
   const sendFeedback = (feedbackType: string, data?: any) => {
     const payload: any = { feedback_type: feedbackType }
-    if (data !== undefined) payload.data = data
-    console.log('payload: ', payload);
+    if (data !== undefined)
+      payload.data = data
+    console.log('payload: ', payload)
     RpaHighlight.send(payload)
   }
 
   const confirmAnchor = () => {
-    if (!anchorRect.value) return
+    if (!anchorRect.value)
+      return
     sendFeedback('confirm', { Boxes: [anchorRect.value] })
     resetCV()
   }
@@ -124,8 +129,6 @@ export function useHighlight() {
   const sendScreenshot = (imageBase64: string) => {
     sendFeedback('screenshot', { image: imageBase64 })
   }
-
-
 
   const confirmCvCtrlPick = (params: { imageDataUrl: string, position: HighlightRect }) => {
     const data = params.position
@@ -223,12 +226,16 @@ export function useHighlight() {
       case 'start':
         windowManager.showWindow()
         windowManager.setWindowAlwaysOnTop(true)
-        if (data.Type) pickMode.value = data.Type
-        if (data.Language) currentLocale.value = data.Language as any
-        tooltipVisible.value = data.Type !== PickMode.VALIDATE || data.mode !== "designate"
+        if (data.Type)
+          pickMode.value = data.Type
+        if (data.Language)
+          currentLocale.value = data.Language as any
+        if (data.Type !== PickMode.VALIDATE && data.mode !== 'designate' && !data.ShortcutKey) {
+          tooltipVisible.value = true
+        }
         windowManager.setMouseIgnore(pickMode.value !== PickMode.VISION)
-        if (data.mode === "designate" && pickMode.value === PickMode.VISION) {
-          captureScreen().then(dataUrl => {
+        if (data.mode === 'designate' && pickMode.value === PickMode.VISION) {
+          captureScreen().then((dataUrl) => {
             sendScreenshot(dataUrl)
           })
         }
@@ -332,6 +339,6 @@ export function useHighlight() {
     resetCV,
     captureDone,
     reCvAnchorPick,
-    confirmCvAnchorPick
+    confirmCvAnchorPick,
   }
 }

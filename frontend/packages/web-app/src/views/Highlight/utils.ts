@@ -1,4 +1,5 @@
-  import { utilsManager } from '@/platform'
-  export const captureScreen = async () => {
-    return await utilsManager.invoke('capture-screen')
-  }
+import { utilsManager } from '@/platform'
+
+export async function captureScreen() {
+  return await utilsManager.invoke('capture-screen')
+}

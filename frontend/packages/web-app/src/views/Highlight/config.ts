@@ -1,18 +1,17 @@
 import { t } from './locale'
 
 export enum PickMode {
-  "" = 'normal',
   NORMAL = 'normal',
   SMART = 'smart',
   VISION = 'vision',
   VISION_PICK = 'vision_pick', // 拾取中
   DESIGNATE = 'designate_pick', // CV 模式的分割，用于区分普通CV拾取和指定区域拾取
   WINDOW = 'window',
-  ELEMENT = "element",
-  POINT = "point",
-  SIMILAR = "similar",
-  BATCH = "batch",
-  VALIDATE = "validate",
+  ELEMENT = 'element',
+  POINT = 'point',
+  SIMILAR = 'similar',
+  BATCH = 'batch',
+  VALIDATE = 'validate',
 }
 
 export enum PickStep {
@@ -73,14 +72,14 @@ export const TipPosition = {
   rightBottom: {
     bottom: '60px',
     right: '10px',
-  }
+  },
 }
 
 export enum PickEvent {
   TARGET_READY = 'target_ready',
   MOUSE_MOVE = 'mouse_move',
   CLICK_CONFIRM = 'click_confirm',
-  DEFAULT = ''
+  DEFAULT = '',
 }
 
 export type CvPickEvent = 'target_ready' | 'mouse_move' | 'click_confirm' | ''
@@ -104,13 +103,13 @@ export interface DrawRect {
 export interface MessageType {
   MouseX?: number
   MouseY?: number
-  Boxes?: DrawRect[],
-  Type?: PickMode,
-  Operation: string,
-  ShortcutKey?: ShortCutKey,
-  Language?: string,
-  TargetRect?: DrawRect,
-  AnchorRect?: DrawRect,
+  Boxes?: DrawRect[]
+  Type?: PickMode
+  Operation: string
+  ShortcutKey?: ShortCutKey
+  Language?: string
+  TargetRect?: DrawRect
+  AnchorRect?: DrawRect
   Event?: PickEvent
   mode?: string
 }

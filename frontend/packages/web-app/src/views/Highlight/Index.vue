@@ -1,10 +1,10 @@
 <!-- @format -->
 
 <script lang="ts" setup>
+import { PickMode } from './config'
+import CV from './CV.vue'
 // import ConfigProvider from '@/components/ConfigProvider/index.vue'
 import { useHighlight } from './hooks/useHighlight'
-import CV from './CV.vue'
-import { PickMode } from './config'
 import { currentLocale, t } from './locale'
 
 const {
@@ -28,53 +28,54 @@ const {
   reCvAnchorPick,
   confirmCvAnchorPick,
 } = useHighlight()
-
 </script>
 
 <template>
-    <div class="highlight-overlay">
-      <div :class="`highlight-area  ${pickMode === PickMode.VALIDATE ? 'highlight-area-validate' : ''}`">
-        <div
-          v-for="(rect, index) in highlightRects"
-          :key="index"
-          :class="`highlight-box ${pickMode === PickMode.VALIDATE ? 'highlight-box-validate' : ''}`"
-          :style="{
-            transform: `translate(${rect.x}px, ${rect.y}px)`,
-            width: rect.width + 'px',
-            height: rect.height + 'px',
-          }"
-        >
-          <div v-if="rect.tag" :class="`highlight-tag highlight-tag-${tagPosition}`">{{ rect.tag }}</div>
-        </div>
-      </div>
-
-      <CV
-        v-if="cvCropShow"
-        :cvStep="pickStep"
-        :targetRect="targetRect"
-        :anchorRect="anchorRect"
-        :targetButton="targetButton"
-        :pickMode="pickMode"
-        @save="confirmCvCtrlPick"
-        @confirm-alt="confirmCvAltPick"
-        @send-screenshot="sendScreenshot"
-        @reselect-alt="reCvAltPick"
-        @reselect-anchor="reCvAnchorPick"
-        @confirm-cv-anchor-pick="confirmCvAnchorPick"
-        @capture-done="captureDone"
-      />
-
-      <div v-if="tooltipVisible" :class="`tooltip bg-bg-elevated ${tooltipPos === 'leftTop' ? 'tooltip-left-top' : 'tooltip-right-bottom'}`">
-        <div class="tooltip-item font-bold" v-for="(sc, i) in shortcuts" :key="i">
-          <span :class="`short-title ${currentLocale === 'en_US' ? 'short-title-en':''}`" >{{ sc.title }}</span>
-          <span class="short-keys">{{ sc.keys }}</span>
-        </div>
-        <div class="tooltip-item">
-          <span :class="`short-title ${currentLocale === 'en_US' ? 'short-title-en':''}`">{{ t('position') }}</span>
-          <span class="short-xy">{{ mousePos.x }},{{ mousePos.y }}</span>
+  <div class="highlight-overlay">
+    <div :class="`highlight-area  ${pickMode === PickMode.VALIDATE ? 'highlight-area-validate' : ''}`">
+      <div
+        v-for="(rect, index) in highlightRects"
+        :key="index"
+        :class="`highlight-box ${pickMode === PickMode.VALIDATE ? 'highlight-box-validate' : ''}`"
+        :style="{
+          transform: `translate(${rect.x}px, ${rect.y}px)`,
+          width: `${rect.width}px`,
+          height: `${rect.height}px`,
+        }"
+      >
+        <div v-if="rect.tag" :class="`highlight-tag highlight-tag-${tagPosition}`">
+          {{ rect.tag }}
         </div>
       </div>
     </div>
+
+    <CV
+      v-if="cvCropShow"
+      :cv-step="pickStep"
+      :target-rect="targetRect"
+      :anchor-rect="anchorRect"
+      :target-button="targetButton"
+      :pick-mode="pickMode"
+      @save="confirmCvCtrlPick"
+      @confirm-alt="confirmCvAltPick"
+      @send-screenshot="sendScreenshot"
+      @reselect-alt="reCvAltPick"
+      @reselect-anchor="reCvAnchorPick"
+      @confirm-cv-anchor-pick="confirmCvAnchorPick"
+      @capture-done="captureDone"
+    />
+
+    <div v-if="tooltipVisible" :class="`tooltip bg-bg-elevated ${tooltipPos === 'leftTop' ? 'tooltip-left-top' : 'tooltip-right-bottom'}`">
+      <div v-for="(sc, i) in shortcuts" :key="i" class="tooltip-item font-bold">
+        <span :class="`short-title ${currentLocale === 'en_US' ? 'short-title-en' : ''}`">{{ sc.title }}</span>
+        <span class="short-keys">{{ sc.keys }}</span>
+      </div>
+      <div class="tooltip-item">
+        <span :class="`short-title ${currentLocale === 'en_US' ? 'short-title-en' : ''}`">{{ t('position') }}</span>
+        <span class="short-xy">{{ mousePos.x }},{{ mousePos.y }}</span>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style lang="scss">
@@ -86,7 +87,6 @@ const {
   left: 0;
   background: transparent;
 }
-
 
 .highlight-box {
   position: absolute;

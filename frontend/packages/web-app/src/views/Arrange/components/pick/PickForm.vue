@@ -73,7 +73,7 @@ defineExpose({
       </a-form-item>
     </a-form>
     <div class="pick-form-checkbox flex flex-row gap-2 mt-8 text-[12px] color-gray-700">
-      <div class="">
+      <div class="pick-form-checkbox-item">
         <div class="mb-2 label-form">
           {{ $t("customization") }}
         </div>
@@ -106,6 +106,10 @@ defineExpose({
   font-size: 12px;
   width: 50%;
 }
+.pick-form-checkbox-item {
+  min-width: 160px;
+}
+
 
 .ant-form-item {
   margin-bottom: 10px;

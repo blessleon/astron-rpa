@@ -30,6 +30,7 @@ export const translations = {
     cvCtrlShortcut: '框选区域',
     cvAltTitle: '智能图像拾取',
     cvAltShortcut: '点击元素',
+    screenshotFailed: '截图失败',
   },
   en_US: {
     position: 'Position',
@@ -58,6 +59,7 @@ export const translations = {
     cvCtrlShortcut: 'Select Area',
     cvAltTitle: 'Smart Image Pick',
     cvAltShortcut: 'Click Element',
+    screenshotFailed: 'Screenshot Failed',
   },
 }
 
@@ -67,6 +69,6 @@ export type TranslationKey = keyof typeof translations.zh_CN
 export const currentLocale = ref<LocaleKey>('zh_CN')
 
 // 翻译函数
-export const t = (key: TranslationKey): string => {
+export function t(key: TranslationKey): string {
   return translations[currentLocale.value]?.[key] ?? translations.zh_CN[key]
 }
