@@ -1,6 +1,7 @@
 import base64
 import contextlib
 import io
+import time
 
 import cv2
 import pyautogui
@@ -10,6 +11,7 @@ from PIL import Image
 from astronverse.vision.core import CvCore
 from astronverse.vision.cv_match import AnchorMatch
 from astronverse.vision.cv_picker import ImageDetector as VisionImageDetector
+from astronverse.picker.logger import logger
 
 
 class RectHandler:
@@ -94,26 +96,40 @@ class ImageDetector(VisionImageDetector):
 
         # 下面逻辑与基类 detect_objects 保持同等筛选流程，
         # 但跳过 output 图绘制阶段，减少全屏场景耗时。
+        total_started = time.time()
+
+        stage_started = time.time()
         blurred = cv2.GaussianBlur(self.gray_img, (3, 3), 0)
         kernel = np.array([[-1, -1, -1], [-1, 9, -1], [-1, -1, -1]])
         sharpened = cv2.filter2D(blurred, -1, kernel)
+        preprocess_elapsed = time.time() - stage_started
 
+        stage_started = time.time()
         canny_gradient = self.compute_canny_edge(sharpened)
         sobel_gradient = self.compute_sobel_gradient(sharpened)
+        gradient_elapsed = time.time() - stage_started
 
+        stage_started = time.time()
         _, fore_g = cv2.threshold(canny_gradient, 127, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         kernel = np.ones((3, 3), np.uint8)
         fore_g = cv2.dilate(fore_g, kernel, iterations=2)
         _, fore_markers = cv2.connectedComponents(fore_g)
         fore_markers = fore_markers.astype(np.uint8)
         fore_contours, _ = cv2.findContours(fore_markers.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        foreground_elapsed = time.time() - stage_started
 
+        stage_started = time.time()
         sobel_contours = self.preprocess_stage(sobel_gradient, False)
+        sobel_elapsed = time.time() - stage_started
+
+        stage_started = time.time()
         canny_contours = self.preprocess_stage(canny_gradient, False)
+        canny_elapsed = time.time() - stage_started
 
         img_h, img_w = self.original_img.shape[0], self.original_img.shape[1]
         img_area = img_h * img_w
 
+        stage_started = time.time()
         fore_boxes = [
             (x, y, w, h)
             for x, y, w, h in (cv2.boundingRect(contour) for contour in fore_contours)
@@ -135,9 +151,33 @@ class ImageDetector(VisionImageDetector):
             and (h / w) < 10
             and (w * h) / img_area < 0.2
         ]
+        box_filter_elapsed = time.time() - stage_started
 
         all_boxes = [list(box) for box in (fore_boxes + sobel_boxes)]
+        stage_started = time.time()
         selected_boxes = self.apply_nms(all_boxes)
+        nms_elapsed = time.time() - stage_started
+        total_elapsed = time.time() - total_started
+        logger.info(
+            "VisionAdapter detect_objects timing total=%.3fs preprocess=%.3fs gradient=%.3fs "
+            "foreground=%.3fs sobel=%.3fs canny=%.3fs box_filter=%.3fs nms=%.3fs "
+            "fore_contours=%d sobel_contours=%d canny_contours=%d fore_boxes=%d sobel_boxes=%d total_boxes=%d selected=%d",
+            total_elapsed,
+            preprocess_elapsed,
+            gradient_elapsed,
+            foreground_elapsed,
+            sobel_elapsed,
+            canny_elapsed,
+            box_filter_elapsed,
+            nms_elapsed,
+            len(fore_contours),
+            len(sobel_contours),
+            len(canny_contours),
+            len(fore_boxes),
+            len(sobel_boxes),
+            len(all_boxes),
+            len(selected_boxes),
+        )
         return self.original_img, selected_boxes
 
     def detect_objects_legacy(self, dash_color, line_width):

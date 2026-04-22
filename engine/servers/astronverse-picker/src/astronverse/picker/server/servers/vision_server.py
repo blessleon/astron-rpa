@@ -428,21 +428,38 @@ class VisionServer:
             left_clicked = event_core.is_left_click()
             if left_clicked:
                 event_core.reset_left_click_flag()
-            if left_clicked and bboxes:
-                cx, cy = pyautogui.position()
-                hit_box = self._get_minbox(cx, cy, bboxes)
-                logger.info(
-                    f"VisionServer _mouse_track_loop click session={self._current_session_id} "
+                if left_clicked and bboxes:
+                    cx, cy = pyautogui.position()
+                    hit_box = self._get_minbox(cx, cy, bboxes)
+                    logger.info(
+                        f"VisionServer _mouse_track_loop click session={self._current_session_id} "
                     f"mouse=({cx},{cy}) hit={hit_box}"
                 )
-                if hit_box is not None:
-                    bx, by, bw, bh = hit_box
-                    target_rect_obj = Rect(bx, by, bx + bw, by + bh)
-                    hl.designate_pick_sync(
-                        target_rect=target_rect_obj,
-                        anchor_rect=None,
-                        event="click_confirm",
-                    )
+                    if hit_box is not None:
+                        bx, by, bw, bh = hit_box
+                        target_rect_obj = Rect(bx, by, bx + bw, by + bh)
+                        hl.designate_pick_sync(
+                            target_rect=target_rect_obj,
+                            anchor_rect=None,
+                            event="click_confirm",
+                        )
+                        wait_result = self._wait_click_feedback(
+                            timeout_sec=max(0.0, timeout - (time.time() - start_time))
+                        )
+                        logger.info(
+                            f"VisionServer _mouse_track_loop click_feedback session={self._current_session_id} "
+                            f"result={wait_result}"
+                        )
+                        if wait_result == "timeout":
+                            return "timeout"
+                        if wait_result == "cancel":
+                            return "cancel"
+                        if wait_result == "shift":
+                            return "shift"
+                        if wait_result == "continue":
+                            continue
+                        if wait_result is not None:
+                            return wait_result
 
             # 检查 hl feedback
             try:
@@ -546,6 +563,25 @@ class VisionServer:
                             anchor_rect=anchor_rect_obj,
                             event="click_confirm",
                         )
+                        wait_result = self._wait_click_feedback(
+                            timeout_sec=max(0.0, timeout - (time.time() - start_time))
+                        )
+                        logger.info(
+                            f"VisionServer _designate_track_loop click_feedback session={self._current_session_id} "
+                            f"result={wait_result}"
+                        )
+                        if wait_result == "timeout":
+                            hl.hide_sync()
+                            return "timeout"
+                        if wait_result == "cancel":
+                            hl.hide_sync()
+                            return "cancel"
+                        if wait_result == "shift":
+                            return "continue"
+                        if wait_result == "continue":
+                            continue
+                        if wait_result is not None:
+                            return wait_result
 
                 # ── 检查 hl feedback ──────────────────────────────────────
                 try:
@@ -788,6 +824,7 @@ class VisionServer:
         import sys
         import platform as _platform
 
+        detect_started = time.time()
         screen_w, screen_h = desktop_image.size
 
         # 获取前景窗口
@@ -807,8 +844,12 @@ class VisionServer:
         partial_rect = (x, y, w, h)
         partial_screenshot = desktop_image.crop((x, y, x + w, y + h))
 
+        detector_started = time.time()
         detector = ImageDetector(partial_screenshot)
+        detector_init_elapsed = time.time() - detector_started
+        detect_objects_started = time.time()
         _, selected_boxes = detector.detect_objects("#00FF00", 1)
+        detect_objects_elapsed = time.time() - detect_objects_started
 
         # 坐标转换为全屏坐标
         bboxes = [
@@ -817,7 +858,9 @@ class VisionServer:
         ]
         bboxes = sorted(bboxes, key=lambda b: b[2] * b[3])
         logger.info(
-            f"VisionServer _detect_alt selected session={self._current_session_id} bbox_count={len(bboxes)}"
+            f"VisionServer _detect_alt selected session={self._current_session_id} "
+            f"bbox_count={len(bboxes)} detector_init={detector_init_elapsed:.3f}s "
+            f"detect_objects={detect_objects_elapsed:.3f}s total={time.time() - detect_started:.3f}s"
         )
         return bboxes, partial_rect
 
@@ -977,6 +1020,78 @@ class VisionServer:
             f"expected={expected_type.value} queue={self._queue_size()}"
         )
         return None
+
+    def _wait_click_feedback(self, timeout_sec: float = 60 * 3):
+        """
+        点击命中候选框后，阻塞等待 hl 回传确认结果，避免继续主循环导致状态错乱。
+        返回：
+            - (left, top, right, bottom): hl CONFIRM 回传的 rect
+            - "continue" | "cancel" | "shift" | "timeout"
+            - None: CONFIRM 数据异常
+        """
+        deadline = time.time() + timeout_sec
+        event_core = self.svc.event_core
+        logger.info(
+            f"VisionServer _wait_click_feedback begin session={self._current_session_id} "
+            f"timeout={timeout_sec} queue={self._queue_size()}"
+        )
+        while time.time() < deadline:
+            if event_core.is_cancel():
+                logger.info(f"VisionServer _wait_click_feedback cancel session={self._current_session_id}")
+                return "cancel"
+            if event_core.is_shift_pressed():
+                logger.info(f"VisionServer _wait_click_feedback shift session={self._current_session_id}")
+                return "shift"
+            try:
+                feedback = self._hl_feedback_queue.get(timeout=0.05)
+                fb_type = feedback.get("feedback_type")
+                logger.info(
+                    f"VisionServer _wait_click_feedback dequeued session={self._current_session_id} "
+                    f"fb_type={fb_type} queue_after_get={self._queue_size()}"
+                )
+                if fb_type == VisionHlFeedback.CONFIRM.value:
+                    result = self._extract_confirm_rect(feedback)
+                    logger.info(
+                        f"VisionServer _wait_click_feedback confirm session={self._current_session_id} "
+                        f"result={result}"
+                    )
+                    return result
+                if fb_type == VisionHlFeedback.CONTINUE.value:
+                    logger.info(f"VisionServer _wait_click_feedback continue session={self._current_session_id}")
+                    return "continue"
+                if fb_type == VisionHlFeedback.STOP.value:
+                    logger.info(f"VisionServer _wait_click_feedback stop session={self._current_session_id}")
+                    return "cancel"
+                self._hl_feedback_queue.put(feedback)
+                logger.info(
+                    f"VisionServer _wait_click_feedback requeue session={self._current_session_id} "
+                    f"fb_type={fb_type} queue_after_put={self._queue_size()}"
+                )
+            except queue.Empty:
+                pass
+
+        logger.warning(
+            f"VisionServer _wait_click_feedback timeout session={self._current_session_id} "
+            f"queue={self._queue_size()}"
+        )
+        return "timeout"
+
+    @staticmethod
+    def _extract_confirm_rect(feedback: dict):
+        boxes = feedback.get("data", {}).get("Boxes", [])
+        data = boxes[0] if isinstance(boxes, list) and boxes else boxes
+        if not data:
+            return None
+        try:
+            return (
+                data["Left"],
+                data["Top"],
+                data["Right"],
+                data["Bottom"],
+            )
+        except KeyError:
+            logger.error(f"VisionServer: CONFIRM data 缺少 rect 字段: {data}")
+            return None
 
     @staticmethod
     def _decode_screenshot(screenshot_data: dict):
