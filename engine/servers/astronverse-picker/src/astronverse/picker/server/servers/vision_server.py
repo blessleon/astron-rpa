@@ -410,6 +410,7 @@ class VisionServer:
         draw_rect = None
         start_time = time.time()
         timeout = 60 * 3
+        event_core.reset_left_click_flag()
 
         while True:
             if time.time() - start_time > timeout:
@@ -525,6 +526,7 @@ class VisionServer:
         last_anchor_rect = None
         start_time = time.time()
         timeout = 60 * 3
+        event_core.reset_left_click_flag()
 
         try:
             while True:
