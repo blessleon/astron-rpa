@@ -570,46 +570,10 @@ class VisionServer:
                             f"VisionServer _designate_track_loop click_feedback session={self._current_session_id} "
                             f"result={wait_result}"
                         )
-                        if wait_result == "timeout":
-                            hl.hide_sync()
-                            return "timeout"
-                        if wait_result == "cancel":
-                            hl.hide_sync()
-                            return "cancel"
-                        if wait_result == "shift":
-                            return "continue"
                         if wait_result == "continue":
                             continue
                         if wait_result is not None:
                             return wait_result
-
-                # ── 检查 hl feedback ──────────────────────────────────────
-                try:
-                    feedback = self._hl_feedback_queue.get_nowait()
-                    fb_type = feedback.get("feedback_type")
-                    if fb_type == VisionHlFeedback.CONFIRM.value:
-                        boxes = feedback.get("data", {}).get("Boxes", [])
-                        logger.info(
-                            f"VisionServer _designate_track_loop confirm session={self._current_session_id} boxes={boxes}"
-                        )
-                        data = boxes[0] if isinstance(boxes, list) and boxes else boxes
-                        try:
-                            return (
-                                data["Left"],
-                                data["Top"],
-                                data["Right"],
-                                data["Bottom"],
-                            )
-                        except KeyError:
-                            logger.error(f"VisionServer: CONFIRM data 缺少 rect 字段: {data}")
-                            return None
-                    elif fb_type == VisionHlFeedback.CONTINUE.value:
-                        logger.info(
-                            f"VisionServer _designate_track_loop continue session={self._current_session_id}"
-                        )
-                        continue
-                except queue.Empty:
-                    pass
 
                 # ── 鼠标移动追踪 ──────────────────────────────────────────
                 cur_x, cur_y = pyautogui.position()
@@ -1059,9 +1023,6 @@ class VisionServer:
                 if fb_type == VisionHlFeedback.CONTINUE.value:
                     logger.info(f"VisionServer _wait_click_feedback continue session={self._current_session_id}")
                     return "continue"
-                if fb_type == VisionHlFeedback.STOP.value:
-                    logger.info(f"VisionServer _wait_click_feedback stop session={self._current_session_id}")
-                    return "cancel"
                 self._hl_feedback_queue.put(feedback)
                 logger.info(
                     f"VisionServer _wait_click_feedback requeue session={self._current_session_id} "

@@ -122,9 +122,11 @@ class ImageDetector(VisionImageDetector):
         sobel_contours = self.preprocess_stage(sobel_gradient, False)
         sobel_elapsed = time.time() - stage_started
 
-        stage_started = time.time()
-        canny_contours = self.preprocess_stage(canny_gradient, False)
-        canny_elapsed = time.time() - stage_started
+        # 旧版 detect_objects 虽然会计算 canny_contours/canny_boxes，
+        # 但最终返回结果只使用 fore_boxes + sobel_boxes。
+        # 快速路径中跳过这段纯冗余计算，保持输出等价并降低 ALT 耗时。
+        canny_contours = []
+        canny_elapsed = 0.0
 
         img_h, img_w = self.original_img.shape[0], self.original_img.shape[1]
         img_area = img_h * img_w
@@ -142,15 +144,6 @@ class ImageDetector(VisionImageDetector):
             if (w * h) > 50 and (h / w) < 10 and (w * h) / img_area < 0.2
         ]
 
-        # 保留与基类一致的中间计算（当前基类最终未并入 canny_boxes），避免行为意外漂移。
-        _ = [
-            (x, y, w, h)
-            for x, y, w, h in (cv2.boundingRect(contour) for contour in canny_contours)
-            if ((w * h) > 20 and (w * h) <= 50)
-            or ((w * h) > 200 and (w * h) <= 350)
-            and (h / w) < 10
-            and (w * h) / img_area < 0.2
-        ]
         box_filter_elapsed = time.time() - stage_started
 
         all_boxes = [list(box) for box in (fore_boxes + sobel_boxes)]
@@ -159,24 +152,15 @@ class ImageDetector(VisionImageDetector):
         nms_elapsed = time.time() - stage_started
         total_elapsed = time.time() - total_started
         logger.info(
-            "VisionAdapter detect_objects timing total=%.3fs preprocess=%.3fs gradient=%.3fs "
-            "foreground=%.3fs sobel=%.3fs canny=%.3fs box_filter=%.3fs nms=%.3fs "
-            "fore_contours=%d sobel_contours=%d canny_contours=%d fore_boxes=%d sobel_boxes=%d total_boxes=%d selected=%d",
-            total_elapsed,
-            preprocess_elapsed,
-            gradient_elapsed,
-            foreground_elapsed,
-            sobel_elapsed,
-            canny_elapsed,
-            box_filter_elapsed,
-            nms_elapsed,
-            len(fore_contours),
-            len(sobel_contours),
-            len(canny_contours),
-            len(fore_boxes),
-            len(sobel_boxes),
-            len(all_boxes),
-            len(selected_boxes),
+            "VisionAdapter detect_objects timing "
+            f"total={total_elapsed:.3f}s preprocess={preprocess_elapsed:.3f}s "
+            f"gradient={gradient_elapsed:.3f}s foreground={foreground_elapsed:.3f}s "
+            f"sobel={sobel_elapsed:.3f}s canny={canny_elapsed:.3f}s "
+            f"box_filter={box_filter_elapsed:.3f}s nms={nms_elapsed:.3f}s "
+            f"fore_contours={len(fore_contours)} sobel_contours={len(sobel_contours)} "
+            f"canny_contours={len(canny_contours)} fore_boxes={len(fore_boxes)} "
+            f"sobel_boxes={len(sobel_boxes)} total_boxes={len(all_boxes)} "
+            f"selected={len(selected_boxes)}"
         )
         return self.original_img, selected_boxes
 
