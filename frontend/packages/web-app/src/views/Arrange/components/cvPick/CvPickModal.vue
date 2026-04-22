@@ -126,7 +126,7 @@ watch(() => cvStore.currentCvItem, (newVal) => {
     setFormOption({ pickName: newVal.name })
     const eleData = JSON.parse(newVal.elementData)
     defaultAnchor.value = eleData.defaultAnchor
-    similarity.value = eleData.similarity || 0.95
+    similarity.value = eleData.similarity || 95
   }
 }, { immediate: true })
 
