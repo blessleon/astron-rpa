@@ -151,9 +151,10 @@ export function useHighlight() {
 
   const reCvAltPick = () => {
     console.log('reCvAltPick: ');
+    canDraw = true
+    targetButton.value = false
     sendFeedback('continue')
     setPickStep(PickStep.ALT)
-    canDraw = true
   }
 
   const captureDone = () => {
@@ -223,7 +224,6 @@ export function useHighlight() {
         if (data.Type === PickMode.DESIGNATE) {
           targetRect.value = handleRect(data.TargetRect)
           targetButton.value = true
-          canDraw = false
           return
         }
         if (canDraw) {
