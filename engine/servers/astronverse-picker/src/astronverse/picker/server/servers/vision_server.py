@@ -11,11 +11,13 @@ VisionServer - 视觉拾取状态机
 
 
 import queue
+import os
 import threading
 import time
 import traceback
 
 import pyautogui
+import cv2
 
 from astronverse.picker import VisionAction, VisionHlFeedback
 from astronverse.picker.logger import logger
@@ -199,6 +201,12 @@ class VisionServer:
         hl = self.svc.ws_server.hl
         event_core = self.svc.event_core
         logger.info(f"VisionServer _run_start begin session={self._current_session_id}")
+        logger.info(
+            f"VisionServer _run_start runtime session={self._current_session_id} "
+            f"pid={os.getpid()} thread={threading.current_thread().name} "
+            f"thread_ident={threading.get_ident()} active_threads={threading.active_count()} "
+            f"cv_threads={cv2.getNumThreads()}"
+        )
         hl.start_sync("vision")
         logger.info(f"VisionServer _run_start hl.start_sync done session={self._current_session_id}")
         event_core.start()
@@ -788,7 +796,8 @@ class VisionServer:
         import sys
         import platform as _platform
 
-        detect_started = time.time()
+        detect_started = time.perf_counter()
+        detect_thread_started = time.thread_time()
         screen_w, screen_h = desktop_image.size
 
         # 获取前景窗口
@@ -808,12 +817,16 @@ class VisionServer:
         partial_rect = (x, y, w, h)
         partial_screenshot = desktop_image.crop((x, y, x + w, y + h))
 
-        detector_started = time.time()
+        detector_started = time.perf_counter()
+        detector_thread_started = time.thread_time()
         detector = ImageDetector(partial_screenshot)
-        detector_init_elapsed = time.time() - detector_started
-        detect_objects_started = time.time()
+        detector_init_elapsed = time.perf_counter() - detector_started
+        detector_init_cpu = time.thread_time() - detector_thread_started
+        detect_objects_started = time.perf_counter()
+        detect_objects_thread_started = time.thread_time()
         _, selected_boxes = detector.detect_objects("#00FF00", 1)
-        detect_objects_elapsed = time.time() - detect_objects_started
+        detect_objects_elapsed = time.perf_counter() - detect_objects_started
+        detect_objects_cpu = time.thread_time() - detect_objects_thread_started
 
         # 坐标转换为全屏坐标
         bboxes = [
@@ -823,8 +836,9 @@ class VisionServer:
         bboxes = sorted(bboxes, key=lambda b: b[2] * b[3])
         logger.info(
             f"VisionServer _detect_alt selected session={self._current_session_id} "
-            f"bbox_count={len(bboxes)} detector_init={detector_init_elapsed:.3f}s "
-            f"detect_objects={detect_objects_elapsed:.3f}s total={time.time() - detect_started:.3f}s"
+            f"bbox_count={len(bboxes)} detector_init={detector_init_elapsed:.3f}s/{detector_init_cpu:.3f}s "
+            f"detect_objects={detect_objects_elapsed:.3f}s/{detect_objects_cpu:.3f}s "
+            f"total={time.perf_counter() - detect_started:.3f}s/{time.thread_time() - detect_thread_started:.3f}s"
         )
         return bboxes, partial_rect
 
