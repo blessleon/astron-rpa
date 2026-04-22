@@ -99,4 +99,5 @@ export interface MessageType {
   ShortcutKey?: ShortCutKey,
   Language?: string,
   TargetRect?: DrawRect,
+  mode: string
 }

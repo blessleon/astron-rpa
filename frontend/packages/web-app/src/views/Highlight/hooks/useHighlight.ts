@@ -3,6 +3,7 @@ import { windowManager } from '@/platform'
 import { PickShortCuts, PickMode, PickStep, ShortCutKey, HighlightRect, MessageType, DrawRect } from '../config'
 import { RpaHighlight } from '@/api/highlight'
 import { currentLocale } from '../locale'
+import { captureScreen } from '../utils'
 
 type CvPickEvent = 'target_ready' | 'mouse_move' | 'click_confirm' | ''
 
@@ -23,6 +24,7 @@ export function useHighlight() {
   const targetButton = ref(false)
   const anchorRect = ref<HighlightRect | null>(null)
   const cvPickEvent = ref<CvPickEvent>('')
+  const screenshotDataUrl = ref('')
 
   // tooltip位置根据鼠标位置动态调整，避免遮挡
   const tooltipPos = computed(() => {
@@ -122,7 +124,6 @@ export function useHighlight() {
   }
 
   const sendScreenshot = (imageBase64: string) => {
-    console.log('sendScreenshot: ', imageBase64)
     sendFeedback('screenshot', { image: imageBase64 })
   }
 
@@ -208,9 +209,11 @@ export function useHighlight() {
         if (data.Language) currentLocale.value = data.Language as any
         tooltipVisible.value = data.Type !== PickMode.VALIDATE
         windowManager.setMouseIgnore(pickMode.value !== PickMode.VISION)
-        // if (data.mode === "designate" && pickMode.value === PickMode.VISION) {
-        //    tooltipVisible.value = false
-        // }
+        if (data.mode === "designate" && pickMode.value === PickMode.VISION) {
+            captureScreen().then(dataUrl => {
+              sendScreenshot(dataUrl)
+            })
+        }
         break
       case 'hide':
         highlightRects.value = []

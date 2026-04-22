@@ -3,6 +3,7 @@
 <script lang="ts" setup>
 import { ref, computed, onMounted } from 'vue'
 import { windowManager, utilsManager } from '@/platform'
+import { captureScreen } from './utils'
 import { t } from './locale'
 import { PickStep, PickMode, HighlightRect } from './config';
 
@@ -194,7 +195,7 @@ function reselectAlt() {
 onMounted(async () => {
   windowManager.setWindowAlwaysOnTop(true)
   try {
-    const dataUrl = await utilsManager.invoke('capture-screen')
+    const dataUrl = await captureScreen()
     if (dataUrl) {
       screenshotDataUrl.value = dataUrl as string
     }

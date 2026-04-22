@@ -155,7 +155,6 @@ export function listenRender() {
 
   // window mouse ignore
   ipcMain.on('window-set-mouse-ignore', (event, ignore) => {
-    console.log('window-set-mouse-ignore ignore: ', ignore);
     const win = BrowserWindow.fromWebContents(event.sender)
     if (ignore) win?.setIgnoreMouseEvents(ignore, { forward: true })
     else win?.setIgnoreMouseEvents(false)
