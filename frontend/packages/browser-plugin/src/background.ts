@@ -80,9 +80,9 @@ chrome.runtime.onConnect.addListener((port) => {
 
 function custom_agent() {
   const modeAgent = {
-    '360se': "$360se$",
-    '360ChromeX': "$360ChromeX$",
-    'chromium': "$chromium$"
+    '360se': '$360se$',
+    '360ChromeX': '$360ChromeX$',
+    'chromium': '$chromium$',
   }
   // @ts-expect-error - this variable is replaced during build time, if not exist, fallback to user agent detection
   return modeAgent[__BUILD_MODE__] || ''
