@@ -1,7 +1,7 @@
 import { log } from './3rd/log'
 import { createWsApp } from './3rd/rpa_websocket'
 import { bgHandler, contentMessageHandler } from './background/backgroundInject'
-import { IGNORE_LOG_KEYS, OLD_EXTENSION_IDS } from './background/constant'
+import { IGNORE_LOG_KEYS, OLD_EXTENSION_IDS } from './common/constant'
 
 function getAllTabs() {
   return new Promise<chrome.tabs.Tab[]>((resolve) => {
@@ -83,11 +83,9 @@ async function wsHandler(message) {
   const msgObject = typeof message === 'string' ? JSON.parse(message) : message
   if (!IGNORE_LOG_KEYS.includes(msgObject.key)) {
     log.info(msgObject.key, msgObject)
-    log.time(msgObject.key)
   }
   const result = await bgHandler(msgObject)
   if (!IGNORE_LOG_KEYS.includes(msgObject.key)) {
-    log.timeEnd(msgObject.key)
     log.info(msgObject.key, result)
   }
   return result

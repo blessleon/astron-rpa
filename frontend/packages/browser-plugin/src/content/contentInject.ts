@@ -1,16 +1,21 @@
-import { DEEP_SEARCH_TRIGGER, ELEMENT_SEARCH_TRIGGER, ErrorMessage, HIGH_LIGHT_BORDER, HIGH_LIGHT_DURATION, SCROLL_DELAY, SCROLL_TIMES, StatusCode } from './constant'
+import { DEEP_SEARCH_TRIGGER, ELEMENT_SEARCH_TRIGGER, ErrorMessage, FRAME_ELEMENT_TAGS, HIGH_LIGHT_BORDER, HIGH_LIGHT_DURATION, SCROLL_DELAY, SCROLL_TIMES, StatusCode } from '../common/constant'
+import { UrlMatcher, UrlMatchLevel } from '../common/urlMatcher'
+import { Utils } from '../common/utils'
+import { t } from '../i18n/index'
+
 import { similarBatch, similarListBatch, tableColumnDataBatch, tableDataBatch, tableDataFormatterProcure, tableHeaderBatch } from './dataBatch'
 import {
   filterVisibleElements,
   findElementByPoint,
-  generateXPath,
   getBoundingClientRect,
   getChildElementByType,
+  getCoveredTopElement,
   getElementByElementInfo,
   getElementBySelector,
   getElementByXPath,
   getElementDirectory,
   getElementsByXpath,
+  getFrameContentRect,
   getNthCssSelector,
   getSiblingElementByType,
   getText,
@@ -22,11 +27,10 @@ import {
 } from './element'
 import { currentFrameInfo, loadIframe, tagFrames } from './iframe'
 import { keepServiceWorkerAlive, notifyContentLoaded, sendElementData } from './message'
-import { Utils } from './utils'
 import { elementChangeWatcher } from './watcher'
 
-let timeoutId: number | null
-let deepTimeoutId: number | null
+let timeoutId
+let deepTimeoutId
 let highlightTime = 0
 const frontCheckEnabled = false
 let deepSearchEnabled = false
@@ -114,7 +118,7 @@ function moveListener(ev: MouseEvent, docu: Document | ShadowRoot, extra) {
 function formatElementInfo(element: HTMLElement, target: Document | ShadowRoot, shadowPath = '', shadowDirs: ElementDirectory[] = []) {
   const cssSelector = getNthCssSelector(element)
   const pathDirs = getElementDirectory(element)
-  const xpath = generateXPath(pathDirs) // generate xpath based on pathDirs
+  const xpath = Utils.generateXPath(pathDirs) // generate xpath based on pathDirs
   const selector = shadowPath ? `${shadowPath}>$shadow$>${cssSelector}` : cssSelector
   const dirs = shadowDirs.length > 0 ? shadowDirs.concat([{ tag: '$shadow$', checked: true, value: '$shadow$', attrs: [] }], pathDirs) : pathDirs
   const tag = Utils.getTag(element)
@@ -166,10 +170,10 @@ function elementNotFoundReason(data: ElementInfo) {
   if (data.pathDirs && data.pathDirs.length === 0 && checkType === 'visualization') {
     return Utils.fail(ErrorMessage.ELEMENT_INFO_INCOMPLETE, StatusCode.ELEMENT_NOT_FOUND)
   }
-  let message = '未找到元素'
+  let message = ErrorMessage.ELEMENT_NOT_FOUND
   const result = elementChangeWatcher(data)
   if (!result.found) {
-    message = `元素在第${result.notFoundIndex}节点${result.notFoundStep}处发生变动`
+    message = t('errors.elementChangedAtNode', { index: String(result.notFoundIndex), step: result.notFoundStep })
   }
   return Utils.fail(message, StatusCode.ELEMENT_NOT_FOUND)
 }
@@ -219,8 +223,15 @@ const ContentHandler = {
 
     getDom: async (data: ElementInfo): Promise<HTMLElement | null> => {
       const eles = await ContentHandler.ele.getElement(data)
-      const result = eles ? eles[0] : null
+      const result = eles?.[eles.length - 1] ?? null
       return result
+    },
+    getZTopElement: async (data: ElementInfo): Promise<HTMLElement | null> => {
+      const eles = await ContentHandler.ele.getElement(data)
+      if (!eles || eles.length === 0) {
+        return null
+      }
+      return getCoveredTopElement(eles)
     },
     getOuterHTML: async (data: ElementInfo) => {
       const ele = await ContentHandler.ele.getDom(data)
@@ -253,19 +264,18 @@ const ContentHandler = {
     },
 
     getElementPos: async (data: ElementInfo) => {
-      let checkEle = null
       try {
-        checkEle = await ContentHandler.ele.getElement(data)
+        const ele = await ContentHandler.ele.getDom(data)
+        if (ele) {
+          const elementPos = getBoundingClientRect(ele)
+          return Utils.success({ rect: elementPos })
+        }
+        else {
+          return elementNotFoundReason(data)
+        }
       }
       catch (error) {
         return Utils.fail(error.toString(), StatusCode.EXECUTE_ERROR)
-      }
-      if (checkEle && checkEle[0]) {
-        const elementPos = getBoundingClientRect(checkEle[0])
-        return Utils.success({ rect: elementPos })
-      }
-      else {
-        return elementNotFoundReason(data)
       }
     },
 
@@ -327,7 +337,12 @@ const ContentHandler = {
     elementIsRender: async (data: ElementInfo) => {
       try {
         const eles = await ContentHandler.ele.getElement({ ...data, filterVisible: true })
-        return Utils.success(eles && eles.length)
+        if (eles && eles.length > 0) {
+          return Utils.success(true)
+        }
+        else {
+          return Utils.success(false)
+        }
       }
       catch (error) {
         return Utils.fail(error.toString(), StatusCode.EXECUTE_ERROR)
@@ -337,7 +352,12 @@ const ContentHandler = {
     elementIsReady: async (data: ElementInfo) => {
       try {
         const eles = await ContentHandler.ele.getElement(data)
-        return Utils.success(eles && eles.length)
+        if (eles && eles.length > 0) {
+          return Utils.success(true)
+        }
+        else {
+          return Utils.success(false)
+        }
       }
       catch (error) {
         return Utils.fail(error.toString(), StatusCode.EXECUTE_ERROR)
@@ -415,17 +435,17 @@ const ContentHandler = {
     },
 
     reSimilarElement: async (data: ElementInfo) => {
-      const preEles = await ContentHandler.ele.getElement(data.preData)
-      const curEles = await ContentHandler.ele.getElement(data)
-      if (preEles && curEles) {
-        const preSelector = getNthCssSelector(preEles[0], true)
-        const prePathDirs = getElementDirectory(preEles[0], true)
-        const preXpath = generateXPath(prePathDirs)
+      const preEle = await ContentHandler.ele.getDom(data.preData)
+      const curEle = await ContentHandler.ele.getDom(data)
+      if (preEle && curEle) {
+        const preSelector = getNthCssSelector(preEle, true)
+        const prePathDirs = getElementDirectory(preEle)
+        const preXpath = Utils.generateXPath(prePathDirs)
         const preElementInfo = { ...data.preData, pathDirs: prePathDirs, xpath: preXpath, cssSelector: preSelector }
 
-        const curSelector = getNthCssSelector(curEles[0], true)
-        const curPathDirs = getElementDirectory(curEles[0], true)
-        const curXpath = generateXPath(curPathDirs)
+        const curSelector = getNthCssSelector(curEle, true)
+        const curPathDirs = getElementDirectory(curEle)
+        const curXpath = Utils.generateXPath(curPathDirs)
         const curElementInfo = { ...data, pathDirs: curPathDirs, xpath: curXpath, cssSelector: curSelector }
 
         return Utils.success({ ...curElementInfo, preData: preElementInfo })
@@ -442,9 +462,8 @@ const ContentHandler = {
       const { produceType, columnIndex } = data
       const highlightColor = Utils.generateColor(columnIndex ? columnIndex - 1 : 0)
       if (produceType === 'table') {
-        const eles = await ContentHandler.ele.getElement(data)
-        if (eles && eles.length > 0) {
-          const ele = eles[0]
+        const ele = await ContentHandler.ele.getDom(data)
+        if (ele) {
           const table = ele.closest('table')
           const rect = []
           const tds: { border: string, td: HTMLElement }[] = []
@@ -671,11 +690,7 @@ const ContentHandler = {
 
     // ---v3
     clickElement: async (data: ElementInfo) => {
-      const eles = await ContentHandler.ele.getElement(data)
-      if (eles && eles.length > 1) {
-        return Utils.fail(ErrorMessage.ELEMENT_MULTI_FOUND, StatusCode.EXECUTE_ERROR)
-      }
-      const result = eles ? eles[0] : null
+      const result = await ContentHandler.ele.getZTopElement(data)
       const { buttonType } = data.atomConfig
       if (!result)
         return elementNotFoundReason(data)
@@ -700,17 +715,32 @@ const ContentHandler = {
     },
 
     inputElement: async (data: ElementInfo) => {
-      const eles = await ContentHandler.ele.getElement(data)
-      if (eles && eles.length > 1) {
-        return Utils.fail(ErrorMessage.ELEMENT_MULTI_FOUND, StatusCode.EXECUTE_ERROR)
-      }
-      const result = (eles ? eles[0] : null) as HTMLInputElement | HTMLTextAreaElement | null
+      const result = await ContentHandler.ele.getZTopElement(data) as HTMLInputElement | HTMLTextAreaElement | null
       const { inputText } = data.atomConfig
       if (result) {
         if (result.tagName !== 'INPUT' && result.tagName !== 'TEXTAREA') {
           return Utils.fail(ErrorMessage.ELEMENT_NOT_INPUT, StatusCode.EXECUTE_ERROR)
         }
-        result.value = inputText
+        // Set value using native setter to trigger Vue/React updates
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+          result.tagName === 'INPUT' ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype,
+          'value',
+        )?.set
+        if (nativeInputValueSetter) {
+          nativeInputValueSetter.call(result, inputText)
+        }
+        else {
+          result.value = inputText
+        }
+
+        // Trigger input event for React controlled components
+        const inputEvent = new Event('input', { bubbles: true, cancelable: true })
+        result.dispatchEvent(inputEvent)
+
+        // Trigger change event for Vue and other frameworks
+        const changeEvent = new Event('change', { bubbles: true, cancelable: true })
+        result.dispatchEvent(changeEvent)
+
         return Utils.success(true)
       }
       else {
@@ -933,8 +963,13 @@ const ContentHandler = {
     getTableData: async (data: ElementInfo) => {
       const result = (await ContentHandler.ele.getDom(data)) as HTMLTableElement
       if (result) {
-        const res = tableDataFormatterProcure(result)
-        return Utils.success(res)
+        if (isTable(result)) {
+          const res = tableDataFormatterProcure(result)
+          return Utils.success(res)
+        }
+        else {
+          return Utils.fail(ErrorMessage.ELEMENT_NOT_TABLE, StatusCode.EXECUTE_ERROR)
+        }
       }
       else {
         return elementNotFoundReason(data)
@@ -1008,21 +1043,38 @@ const ContentHandler = {
       const frames = getWindowFrames()
       return Utils.success(frames)
     },
-    getFramePosition(data: { url: string, iframeXpath: string }) {
+    getFramePosition(data: { url?: string, iframeXpath?: string }) {
       const { url, iframeXpath } = data
-      const frames = getWindowFrames()
-      const frame = iframeXpath ? frames.find(item => item.xpath === iframeXpath) : frames.find(item => item.src.includes(url) || url.includes(item.src))
-      if (frame) {
-        return frame.rect
+      const defaultRect = { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 }
+      if (iframeXpath) {
+        const frameDom = getElementByXPath(iframeXpath)
+        if (frameDom) {
+          const frameRect = getFrameContentRect(frameDom)
+          return frameRect
+        }
+        return defaultRect
       }
-      else {
-        return { x: 0, y: 0, width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 }
+      if (url) {
+        const frames = getWindowFrames()
+        const bestMatch = UrlMatcher.findBestMatch(
+          url,
+          frames.map(f => f.src),
+        )
+        if (bestMatch?.result.level >= UrlMatchLevel.DOMAIN) {
+          const frame = frames.find(f => f.src === bestMatch.url)
+          if (frame?.rect) {
+            return frame.rect
+          }
+        }
+        return defaultRect
       }
+      return defaultRect
     },
     getFrameInfo(data: { frameId: number }) {
       const { frameId } = data
       console.log(`rpa_debugger_on:${frameId}`) // !!! Do not delete. Rely on this code to determine which frame chrome.debugger is injected into
       currentFrameInfo.frameId = frameId
+      document.documentElement.dataset.astronFrameId = String(frameId)
       tagFrames()
       return currentFrameInfo
     },
@@ -1053,7 +1105,7 @@ const ContentHandler = {
           y: (realY - top - borderTop - paddingTop) * dpr,
         }
         let iframeContentRect = null
-        if (iframeEle.tagName === 'IFRAME' || iframeEle.tagName === 'FRAME') {
+        if (FRAME_ELEMENT_TAGS.includes(iframeEle.tagName.toLowerCase())) {
           iframeContentRect = {
             x: (left + borderLeft + paddingLeft) * dpr,
             y: (top + borderTop + paddingTop) * dpr,
@@ -1062,6 +1114,21 @@ const ContentHandler = {
         }
         const iframeInfo = formatElementInfo(iframeEle, document)
         return { ...iframeInfo, nextPos, iframeContentRect }
+      }
+    },
+    elementLocatorFrameId: async (data: ElementInfo) => {
+      let checkEles = null
+      try {
+        checkEles = await ContentHandler.ele.getElement(data)
+      }
+      catch (error) {
+        return Utils.fail(error.toString(), StatusCode.EXECUTE_ERROR)
+      }
+      if (checkEles && checkEles.length > 0) {
+        return { frameId: currentFrameInfo.frameId }
+      }
+      else {
+        return { frameId: null }
       }
     },
     stopLoad() {
@@ -1108,8 +1175,21 @@ function executeHandler(key: string, data, isAsync: boolean = true) {
     }
   }
   catch (error) {
-    return Utils.fail(error.toString(), StatusCode.EXECUTE_ERROR)
+    return handleError(error)
   }
+}
+
+function handleError(error) {
+  if (error instanceof SyntaxError) {
+    return Utils.fail(ErrorMessage.SYNTAX_ERROR + error.message, StatusCode.EXECUTE_ERROR)
+  }
+  if (error instanceof TypeError) {
+    return Utils.fail(ErrorMessage.TYPE_ERROR + error.message, StatusCode.EXECUTE_ERROR)
+  }
+  if (error instanceof ReferenceError) {
+    return Utils.fail(ErrorMessage.REFERENCE_ERROR + error.message, StatusCode.EXECUTE_ERROR)
+  }
+  return Utils.fail(error.toString(), StatusCode.EXECUTE_ERROR)
 }
 
 async function handle(params) {
@@ -1124,7 +1204,7 @@ function handleSync(params) {
 function RpaExtGetElement(data) {
   try {
     const eles = getElementByElementInfo(data)
-    return eles ? eles[0] : null
+    return eles?.[eles.length - 1] || null
   }
   catch (error) {
     throw new Error(error.toString())
