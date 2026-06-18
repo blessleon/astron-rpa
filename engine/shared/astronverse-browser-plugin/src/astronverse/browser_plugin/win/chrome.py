@@ -136,11 +136,10 @@ class ChromePluginManager(PluginManagerCore):
         check browser running
         """
         return is_browser_running("chrome")
-    
+
     def update_registry(self, extension_id, version, plugin_path):
         # update registry for plugin
         logger.info(f"Updating registry for Chrome plugin {plugin_path}")
         Registry.create(self.extension_path)
         Registry.add_string_value(self.extension_path, "path", plugin_path)
         Registry.add_string_value(self.extension_path, "version", version)
-
