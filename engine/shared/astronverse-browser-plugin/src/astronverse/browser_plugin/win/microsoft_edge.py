@@ -59,6 +59,7 @@ class EdgePluginManager(PluginManagerCore):
         return browser_registry
 
     def check_plugin(self):
+        self.update_registry(self.plugin_data.plugin_id, self.plugin_data.plugin_version, self.plugin_data.plugin_path)
         installed, installed_version = check_chrome_plugin(
             preferences_path_list=self.preferences_path_list,
             extension_id=self.plugin_data.plugin_id,
@@ -134,3 +135,10 @@ class EdgePluginManager(PluginManagerCore):
         check browser running
         """
         return is_browser_running("msedge")
+
+    def update_registry(self, extension_id, version, plugin_path):
+        # update registry for plugin
+        logger.info(f"Updating registry for Edge plugin {plugin_path}")
+        Registry.create(self.extension_path)
+        Registry.add_string_value(self.extension_path, "path", plugin_path)
+        Registry.add_string_value(self.extension_path, "version", version)
