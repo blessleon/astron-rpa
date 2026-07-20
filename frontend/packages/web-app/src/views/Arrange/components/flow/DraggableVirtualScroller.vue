@@ -254,6 +254,8 @@ function initSortable() {
         const newIndex = getContext(e.related).index
         realItems.value.splice(newIndex, 0, realItems.value.splice(oldIndex, 1)[0])
       }
+      // 允许跨容器拖拽（从 AtomTree 拖入）
+      return true
     },
     onEnd: (e) => {
       if (e.from === e.to) {
