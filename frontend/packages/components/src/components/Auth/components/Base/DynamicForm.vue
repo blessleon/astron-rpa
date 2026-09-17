@@ -102,6 +102,7 @@ defineExpose({
           :placeholder="field.placeholder"
           :wrap-ref="formRef"
           :relation-key="field.relationKey"
+          :scene="field.scene"
           :send-captcha="field.sendCaptcha"
           :disabled="getDisabledState(field)"
           v-bind="field.props"

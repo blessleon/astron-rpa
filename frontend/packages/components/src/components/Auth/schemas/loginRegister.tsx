@@ -1,7 +1,7 @@
 import { Button, Checkbox } from 'ant-design-vue'
 import i18next from 'i18next'
 
-import { sendCaptcha } from '../api/login'
+import { requestVerificationCode } from '../api/requestVerificationCode'
 
 import { fieldFactories } from './factories'
 import type { FormConfig } from './factories'
@@ -124,9 +124,9 @@ export function phoneLoginFormConfig(isInvite = false, edition = 'saas', authTyp
       fieldFactories.phone(),
       {
         ...fieldFactories.captcha(),
-        sendCaptcha: async (phone: string) => {
-          await sendCaptcha(phone, 'login', false)
-        },
+        scene: 'login',
+        sendCaptcha: (phone: string, verifyHuman: () => Promise<string>) =>
+          requestVerificationCode({ phone, scene: 'login', isRegister: false, verifyHuman }),
       },
       fieldFactories.agreement(),
     ],
@@ -159,9 +159,9 @@ export function personalRegisterFormConfig(formData: any, isInvite = false, edit
           fieldFactories.phone(),
           {
             ...fieldFactories.captcha(),
-            sendCaptcha: async (phone: string) => {
-              await sendCaptcha(phone, 'register', true)
-            },
+            scene: 'register',
+            sendCaptcha: (phone: string, verifyHuman: () => Promise<string>) =>
+              requestVerificationCode({ phone, scene: 'register', isRegister: true, verifyHuman }),
           },
           fieldFactories.agreement(),
         ],
@@ -222,9 +222,9 @@ export const forgotPasswordFormConfig: FormConfig = {
     fieldFactories.phone(),
     {
       ...fieldFactories.captcha(),
-      sendCaptcha: async (phone: string) => {
-        await sendCaptcha(phone, 'set_password', false)
-      },
+      scene: 'set_password',
+      sendCaptcha: (phone: string, verifyHuman: () => Promise<string>) =>
+        requestVerificationCode({ phone, scene: 'set_password', isRegister: false, verifyHuman }),
     },
   ],
   actionsRender: ({ handleEvents }) => (

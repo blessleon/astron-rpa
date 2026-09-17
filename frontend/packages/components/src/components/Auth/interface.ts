@@ -2,6 +2,7 @@ export type Platform = 'client' | 'admin' | 'invite'
 export type Edition = 'saas' | 'enterprise'
 export type AuthType = 'uap' | 'casdoor'
 export type LoginMode = 'PASSWORD' | 'CODE'
+export type VerificationCodeScene = 'login' | 'register' | 'set_password'
 export type RegisterMode = 'REGISTER' | 'CONSULT'
 export type AuthFormMode = 'login' | 'register' | 'forgotPassword' | 'setPassword' | 'tenantSelect' | 'forgotPasswordWithSysUpgrade' | 'setPasswordWithSysUpgrade' | 'modifyPassword'
 export type AsyncAction = 'IDLE' | 'PASSWORD' | 'CODE' | 'REGISTER' | 'CONSULT' | 'FORGOT_PASSWORD' | 'SET_PASSWORD' | 'MODIFY_PASSWORD' | 'CHOOSE_TENANT'
@@ -18,6 +19,32 @@ export interface LoginFormData {
   confirmPassword?: string
   oldPassword?: string
   newPassword?: string
+}
+
+/** One AJ-Captcha slider challenge. Images are raw base64, without a data: prefix. */
+export interface AjCaptchaData {
+  originalImageBase64?: string
+  jigsawImageBase64?: string
+  secretKey?: string
+  token?: string
+  result?: boolean
+}
+
+/** AJ-Captcha wraps its own envelope inside the standard response body. */
+export interface AjCaptchaResponse {
+  repCode?: string
+  repMsg?: string
+  repData?: AjCaptchaData
+}
+
+/** One-time ticket bound to phone + scene + client IP, consumed by /verification-code/send. */
+export interface HumanVerificationTicket {
+  captchaTicket: string
+  expireSeconds?: number
+}
+
+export interface SendVerificationCodeResult {
+  retryAfterSeconds?: number
 }
 
 export interface TenantItem {

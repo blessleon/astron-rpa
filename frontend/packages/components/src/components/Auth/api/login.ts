@@ -1,7 +1,13 @@
-import { message } from 'ant-design-vue'
-import i18next from 'i18next'
-
-import type { ConsultFormData, LoginFormData, RegisterFormData, TenantItem } from '../interface'
+import type {
+  AjCaptchaResponse,
+  ConsultFormData,
+  HumanVerificationTicket,
+  LoginFormData,
+  RegisterFormData,
+  SendVerificationCodeResult,
+  TenantItem,
+  VerificationCodeScene,
+} from '../interface'
 
 import { http } from './http'
 
@@ -44,16 +50,48 @@ export async function preAuthenticate(params: PreAuthenticateData) {
   return data
 }
 
-// 发送验证码
-export async function sendCaptcha(phone: string, scene: string, isRegister: boolean = true) {
-  if (!isRegister) {
-    const registered = await checkRegistered({ phone })
-    if (!registered) {
-      message.warning(i18next.t('components.auth.phoneNotRegistered'))
-      return Promise.reject(new Error(i18next.t('components.auth.phoneNotRegistered')))
-    }
-  }
-  const { data } = await http.postparams('/rpa-auth/verification-code/send', { phone, scene })
+// 获取滑块拼图
+export async function getAjCaptcha(clientUid: string) {
+  const { data } = await http.post<AjCaptchaResponse>('/rpa-auth/human-verification/captcha/get', {
+    clientUid,
+    ts: Date.now(),
+  })
+  return data
+}
+
+// 校验滑块坐标
+export async function checkAjCaptcha(params: { token: string, pointJson: string, clientUid: string }) {
+  const { data } = await http.post<AjCaptchaResponse>('/rpa-auth/human-verification/captcha/check', {
+    ...params,
+    ts: Date.now(),
+  })
+  return data
+}
+
+// 用滑块凭证换取一次性人机验证票据
+export async function issueHumanVerificationTicket(
+  phone: string,
+  scene: VerificationCodeScene,
+  captchaProof: string,
+) {
+  const { data } = await http.post<HumanVerificationTicket>('/rpa-auth/human-verification/ticket', {
+    phone,
+    scene,
+    captchaProof,
+  })
+  return data
+}
+
+/**
+ * 发送验证码。captchaTicket 由服务端强制校验，必须先完成人机验证。
+ * 编排逻辑见 ./requestVerificationCode.ts。
+ */
+export async function sendCaptcha(phone: string, scene: VerificationCodeScene, captchaTicket: string) {
+  const { data } = await http.post<SendVerificationCodeResult>('/rpa-auth/verification-code/send', {
+    phone,
+    scene,
+    captchaTicket,
+  })
   return data
 }
 

@@ -4,6 +4,7 @@ import type { Component, VNode } from 'vue'
 import type { JSX } from 'vue/jsx-runtime'
 
 import AgreementTxt from '../components/Base/AgreementTxt.vue'
+import type { SendVerificationCodeResult, VerificationCodeScene } from '../interface'
 
 export type FieldType = 'input' | 'password' | 'captcha' | 'select' | 'checkbox' | 'textarea' | 'slot'
 
@@ -29,7 +30,9 @@ export interface FieldSchema {
   relationKey?: string
   rules?: any[]
   props?: Record<string, any>
-  sendCaptcha?: (phone: string) => Promise<void>
+  scene?: VerificationCodeScene
+  /** verifyHuman runs the slider challenge; its proof is required to send an SMS. */
+  sendCaptcha?: (phone: string, verifyHuman: () => Promise<string>) => Promise<SendVerificationCodeResult | void>
   hidden?: (model: any) => boolean
   disabled?: boolean | ((model: any) => boolean)
   customRender?: (ctx?: {
@@ -217,6 +220,7 @@ export const fieldFactories = {
     type: 'captcha',
     placeholder: i18next.t('authForm.captchaPlaceholder'),
     relationKey: 'phone',
+    // Overridden per scene in loginRegister.tsx, where the send flow is wired up.
     sendCaptcha: () => Promise.resolve(),
     rules: [
       required(i18next.t('authForm.captchaRequired')),
