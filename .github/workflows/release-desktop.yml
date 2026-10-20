@@ -1,0 +1,205 @@
+name: Build and Release Astron RPA Desktop
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '上传到哪个已存在的 Release（留空则只构建、产物存为 workflow artifact）'
+        required: false
+        default: ''
+        type: string
+      edition:
+        description: '前端版本配置（对应 web-app/.env.<edition>）'
+        required: false
+        default: 'opensource'
+        type: choice
+        options:
+          - opensource
+          - saas
+          - enterprise
+
+concurrency:
+  group: release-desktop-${{ github.event.release.tag_name || inputs.tag || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write # 上传 Release 附件需要
+
+env:
+  PYTHON_VERSION: '3.13'
+  NODE_VERSION: '22'
+  PNPM_VERSION: '9'
+  SEVENZ_EXE: 'C:\Program Files\7-Zip\7z.exe' # windows-latest 预装
+
+jobs:
+  build-windows:
+    name: 🪟 Build Windows Installer
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      # 外部输入统一走环境变量，避免在 run 脚本里直接拼接表达式
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      EDITION: ${{ inputs.edition || 'opensource' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      # ------------------------------------------------------------------
+      # 版本号：Release 触发时用 tag 覆盖 electron-app/package.json 的 version
+      # ------------------------------------------------------------------
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $pkg = Get-Content frontend/packages/electron-app/package.json -Raw | ConvertFrom-Json
+          $version = $pkg.version
+          if ($env:RELEASE_TAG) {
+            $version = $env:RELEASE_TAG -replace '^v', ''
+            if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') {
+              Write-Error "Tag '$env:RELEASE_TAG' 不是合法的 semver（例如 v1.2.0 / v1.2.0-beta.1）"
+              exit 1
+            }
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "🏷️ Version: $version  Edition: $env:EDITION  Tag: $env:RELEASE_TAG"
+
+      # ------------------------------------------------------------------
+      # 引擎：复用 build.bat（只构建 engine），产出 resources/python_core.7z
+      # ------------------------------------------------------------------
+      - name: Setup Python
+        id: python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          architecture: x64
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: engine/uv.lock
+
+      - name: Build engine (build.bat --skip-frontend)
+        shell: pwsh
+        env:
+          PYTHON_EXE: ${{ steps.python.outputs.python-path }}
+        run: |
+          & .\build.bat --skip-frontend --python-exe "$env:PYTHON_EXE" --sevenz-exe "$env:SEVENZ_EXE"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path resources/python_core.7z)) {
+            Write-Error "resources/python_core.7z 未生成"
+            exit 1
+          }
+          Get-Item resources/python_core.7z | Format-Table Name, Length
+
+      # ------------------------------------------------------------------
+      # 前端：自行执行构建步骤，以便给 electron-builder 传 --publish never
+      # ------------------------------------------------------------------
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Apply edition config (.env + resources/conf.yaml)
+        working-directory: frontend/packages/web-app
+        shell: pwsh
+        run: node ./env.js "$env:EDITION"
+
+      - name: Set app version
+        working-directory: frontend/packages/electron-app
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+        run: npm pkg set "version=$env:APP_VERSION"
+
+      - name: Build electron app (sdk + typecheck + main + web-app)
+        working-directory: frontend/packages/electron-app
+        run: pnpm run build
+
+      - name: Package Windows installer
+        working-directory: frontend/packages/electron-app
+        shell: pwsh
+        # 不传 GH_TOKEN，并显式 --publish never，避免 electron-builder 在 tag 构建时自动发布
+        # CI 产物改用 ASCII 文件名：GitHub Release 会改写含中文的附件名，导致 latest.yml 中的路径对不上
+        run: |
+          pnpm exec electron-builder --win --x64 --publish never '-c.artifactName=astron-rpa-${version}-${arch}.${ext}'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Collect artifacts and checksums
+        id: collect
+        working-directory: frontend/packages/electron-app/dist
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -File | Where-Object {
+            $_.Name -like '*.exe' -or $_.Name -like '*.blockmap' -or $_.Name -eq 'latest.yml'
+          }
+          if (-not ($files | Where-Object { $_.Name -like '*.exe' })) {
+            Write-Error "dist 目录下没有找到安装包"
+            exit 1
+          }
+          $files | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Set-Content -Encoding utf8NoBOM SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: astron-rpa-windows-${{ steps.version.outputs.version }}
+          path: |
+            frontend/packages/electron-app/dist/*.exe
+            frontend/packages/electron-app/dist/*.blockmap
+            frontend/packages/electron-app/dist/latest.yml
+            frontend/packages/electron-app/dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload to GitHub Release
+        if: env.RELEASE_TAG != ''
+        working-directory: frontend/packages/electron-app/dist
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $files = @(Get-ChildItem -File | Where-Object {
+            $_.Name -like '*.exe' -or $_.Name -like '*.blockmap' -or
+            $_.Name -eq 'latest.yml' -or $_.Name -eq 'SHA256SUMS.txt'
+          } | ForEach-Object { $_.Name })
+          gh release upload "$env:RELEASE_TAG" @files --clobber --repo "$env:GITHUB_REPOSITORY"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Summary
+        if: always()
+        shell: pwsh
+        env:
+          APP_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $sums = if (Test-Path frontend/packages/electron-app/dist/SHA256SUMS.txt) {
+            Get-Content frontend/packages/electron-app/dist/SHA256SUMS.txt -Raw
+          } else { '(无产物)' }
+          @"
+          ## 🖥️ Desktop Build
+          - Version: ``$env:APP_VERSION``
+          - Edition: ``$env:EDITION``
+          - Release: ``$(if ($env:RELEASE_TAG) { $env:RELEASE_TAG } else { '未上传（仅 artifact）' })``
+
+          ``````
+          $sums
+          ``````
+          "@ >> $env:GITHUB_STEP_SUMMARY
