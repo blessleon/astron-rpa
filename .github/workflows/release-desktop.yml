@@ -32,6 +32,7 @@ env:
   PYTHON_VERSION: '3.13.2'
   NODE_VERSION: '24.21.0'
   PNPM_VERSION: '12.3.4'
+  SWIG_VERSION: '4.1.1'
   SEVENZ_EXE: 'C:\Program Files\7-Zip\7z.exe' # Preinstalled on windows-latest
 
 jobs:
@@ -84,6 +85,49 @@ jobs:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
           cache-dependency-glob: engine/uv.lock
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install SWIG
+        shell: pwsh
+        env:
+          SWIG_VERSION: ${{ env.SWIG_VERSION }}
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "swigwin-$env:SWIG_VERSION.zip"
+          $extractRoot = Join-Path $env:RUNNER_TEMP "swig-$env:SWIG_VERSION"
+          $uri = "https://sourceforge.net/projects/swig/files/swigwin/swigwin-$env:SWIG_VERSION/swigwin-$env:SWIG_VERSION.zip/download"
+
+          Invoke-WebRequest -Uri $uri -OutFile $archive
+          New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
+          Expand-Archive -LiteralPath $archive -DestinationPath $extractRoot -Force
+
+          $swigExe = Get-ChildItem -LiteralPath $extractRoot -Filter 'swig.exe' -File -Recurse | Select-Object -First 1
+          if ($null -eq $swigExe) {
+            Write-Error "SWIG executable was not found under: $extractRoot"
+            exit 1
+          }
+
+          $swigHome = $swigExe.DirectoryName
+          $swigHome | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & $swigExe.FullName -version
+
+      - name: Verify native build toolchain
+        shell: pwsh
+        run: |
+          foreach ($command in @('swig', 'msbuild', 'cl')) {
+            if (-not (Get-Command $command -ErrorAction SilentlyContinue)) {
+              Write-Error "Required native build tool was not found: $command"
+              exit 1
+            }
+          }
+          swig -version
+          msbuild -version
 
       - name: Build engine (build.bat --skip-frontend)
         shell: pwsh
