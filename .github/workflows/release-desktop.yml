@@ -131,7 +131,7 @@ jobs:
             exit $LASTEXITCODE
           }
 
-          $signature = [byte[]](Get-Content -LiteralPath $archive -Encoding Byte -TotalCount 4)
+          $signature = [System.IO.File]::ReadAllBytes($archive)
           if ($signature.Count -lt 4 -or $signature[0] -ne 0x50 -or $signature[1] -ne 0x4B -or $signature[2] -ne 0x03 -or $signature[3] -ne 0x04) {
             Write-Error "Downloaded SWIG file is not a valid ZIP archive: $archive"
             exit 1
