@@ -51,7 +51,7 @@ jobs:
       EDITION: ${{ inputs.edition || 'saas' }}
       # Configure the repository or environment variable SAAS_REMOTE_ADDR for release-triggered builds.
       # workflow_dispatch.remote_addr can override it for a one-off manual build.
-      RPA_REMOTE_ADDR: ${{ inputs.remote_addr || vars.SAAS_REMOTE_ADDR }}
+      RPA_REMOTE_ADDR: ${{ inputs.remote_addr || vars.SAAS_REMOTE_ADDR || secrets.SAAS_REMOTE_ADDR }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -76,6 +76,14 @@ jobs:
           }
           "version=$version" >> $env:GITHUB_OUTPUT
           Write-Host "🏷️ Version: $version  Edition: $env:EDITION  Tag: $env:RELEASE_TAG"
+
+      - name: Validate SaaS service address
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:RPA_REMOTE_ADDR)) {
+            Write-Error "RPA_REMOTE_ADDR is empty. Configure the SAAS_REMOTE_ADDR repository variable or secret, or provide workflow_dispatch.remote_addr."
+            exit 1
+          }
 
       # ------------------------------------------------------------------
       # Build the engine with build.bat and produce resources/python_core.7z.
@@ -111,9 +119,29 @@ jobs:
           $extractRoot = Join-Path $env:RUNNER_TEMP "swig-$env:SWIG_VERSION"
           $uri = "https://sourceforge.net/projects/swig/files/swigwin/swigwin-$env:SWIG_VERSION/swigwin-$env:SWIG_VERSION.zip/download"
 
-          Invoke-WebRequest -Uri $uri -OutFile $archive
           New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
-          Expand-Archive -LiteralPath $archive -DestinationPath $extractRoot -Force
+          if (-not (Test-Path -LiteralPath $env:SEVENZ_EXE)) {
+            Write-Error "7-Zip was not found: $env:SEVENZ_EXE"
+            exit 1
+          }
+
+          & curl.exe --fail --location --retry 3 --retry-delay 2 --output $archive $uri
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to download SWIG archive: $uri"
+            exit $LASTEXITCODE
+          }
+
+          $signature = [byte[]](Get-Content -LiteralPath $archive -Encoding Byte -TotalCount 4)
+          if ($signature.Count -lt 4 -or $signature[0] -ne 0x50 -or $signature[1] -ne 0x4B -or $signature[2] -ne 0x03 -or $signature[3] -ne 0x04) {
+            Write-Error "Downloaded SWIG file is not a valid ZIP archive: $archive"
+            exit 1
+          }
+
+          & $env:SEVENZ_EXE x $archive "-o$extractRoot" -y
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to extract SWIG archive: $archive"
+            exit $LASTEXITCODE
+          }
 
           $swigExe = Get-ChildItem -LiteralPath $extractRoot -Filter 'swig.exe' -File -Recurse | Select-Object -First 1
           if ($null -eq $swigExe) {
@@ -124,6 +152,7 @@ jobs:
           $swigHome = $swigExe.DirectoryName
           $swigHome | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           & $swigExe.FullName -version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify native build toolchain
         shell: pwsh
