@@ -13,12 +13,17 @@ on:
       edition:
         description: 'Frontend version configuration (maps to web-app/.env.<edition>)'
         required: false
-        default: 'opensource'
+        default: 'saas'
         type: choice
         options:
           - opensource
           - saas
           - enterprise
+      remote_addr:
+        description: 'SaaS service base URL override (repository variable SAAS_REMOTE_ADDR is preferred)'
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: release-desktop-${{ github.event.release.tag_name || inputs.tag || github.ref }}
@@ -43,7 +48,10 @@ jobs:
     env:
       # Pass external inputs through environment variables instead of embedding expressions in scripts.
       RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
-      EDITION: ${{ inputs.edition || 'opensource' }}
+      EDITION: ${{ inputs.edition || 'saas' }}
+      # Configure the repository or environment variable SAAS_REMOTE_ADDR for release-triggered builds.
+      # workflow_dispatch.remote_addr can override it for a one-off manual build.
+      RPA_REMOTE_ADDR: ${{ inputs.remote_addr || vars.SAAS_REMOTE_ADDR }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -165,7 +173,13 @@ jobs:
       - name: Apply edition config (.env + resources/conf.yaml)
         working-directory: frontend/packages/web-app
         shell: pwsh
-        run: node ./env.js "$env:EDITION"
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:RPA_REMOTE_ADDR)) {
+            Write-Error "RPA_REMOTE_ADDR is empty. Configure the SAAS_REMOTE_ADDR GitHub variable or provide workflow_dispatch.remote_addr."
+            exit 1
+          }
+          node ./env.js "$env:EDITION"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Set app version
         working-directory: frontend/packages/electron-app
