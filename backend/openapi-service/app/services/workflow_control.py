@@ -8,12 +8,14 @@ from datetime import UTC
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.models.workflow import Execution, Workflow
+from app.schemas.integration import CAPABILITY_CLASSES
 from app.schemas.workflow import ExecutionCreate
 from app.security.workflow_authorization import WorkflowAccessError
 from app.services import execution_management as management
 from app.services.execution import ExecutionService
-from app.services.integration_policy import JSON_DATA_CLASS, workflow_profile
+from app.services.integration_policy import workflow_profile
 from app.services.workflow import WorkflowService
 from app.services.workflow_schema import JSON_LIMITS, validate_arguments, workflow_input_schema
 
@@ -37,7 +39,12 @@ class WorkflowControlService:
             admission = profile["admission"]
         except WorkflowControlError as exc:
             admission = {"allowed": False, "reason": exc.code, "enforced": None}
-            profile = {"capabilityClass": None, "capabilities": None}
+            profile = {
+                "capabilityClass": None,
+                "capabilities": None,
+                "componentOperations": None,
+                "allowedTransports": None,
+            }
         return {
             "projectId": workflow.project_id,
             "name": workflow.name,
@@ -46,6 +53,8 @@ class WorkflowControlService:
             "admission": admission,
             "capabilityClass": profile["capabilityClass"],
             "capabilities": profile["capabilities"],
+            "componentOperations": profile["componentOperations"],
+            "allowedTransports": profile["allowedTransports"],
         }
 
     async def list_workflows(self, user_id: str, offset: int = 0, limit: int = 100) -> dict:
@@ -80,10 +89,14 @@ class WorkflowControlService:
             "requiredClientProtocol": 1,
             "durableIdempotency": True,
             "operations": ["workflow_list", "workflow_get", "workflow_execute", "execution_get", "execution_cancel"],
-            "capabilityClasses": [JSON_DATA_CLASS],
+            "capabilityClasses": list(CAPABILITY_CLASSES),
             "jsonLimits": JSON_LIMITS.copy(),
             "client": client,
-            "limitations": ["single-openapi-owner", "controlled-validation", "secret-inputs-suppress-results"],
+            "limitations": [
+                "same-host-shared-storage" if get_settings().EXECUTION_ROUTING == "redis" else "single-openapi-owner",
+                "controlled-validation",
+                "secret-inputs-suppress-results",
+            ],
         }
 
     async def execute_workflow(
@@ -113,6 +126,7 @@ class WorkflowControlService:
             ),
             user_id,
             wait=False,
+            transport="mcp",
         )
         return self.execution_result(execution)
 

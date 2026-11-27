@@ -10,13 +10,19 @@ ngx.req.clear_header("user-info")
 -- rewrite has already removed /api/rpa-openapi; use the normalized URI.
 local path = ngx.var.uri
 local external = path == "/workflows/execute"
+    or path == "/files"
+    or path:match("^/files/[^/]+$")
+    or path:match("^/files/[^/]+/content$")
+    or path:match("^/files/transfer/[^/]+$")
     or path == "/workflows/execute-async"
+    or path == "/workflows/integration"
     or path == "/workflows/stop-current"
     or path == "/workflows/copy-workflow"
     or path == "/health/local-check"
     or path == "/health/remote-check"
     or path == "/executions/get"
     or path:match("^/executions/[^/]+$")
+    or path:match("^/executions/[^/]+/cancel$")
 local hybrid = path == "/workflows/get" or path:match("^/workflows/get/[^/]+$")
 local credentials = headers["authorization"] ~= nil or headers["x-api-key"] ~= nil
     or ngx.req.get_uri_args().key ~= nil

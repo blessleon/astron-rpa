@@ -44,7 +44,13 @@ def policy(tmp_path, monkeypatch):
             "allowed": True,
         }
         declaration.update(changes)
-        path.write_text(json.dumps({"schemaVersion": 1, "enforcedUsers": ["owner"], "declarations": [declaration]}))
+        # Match the documented deployment path. Same-size in-place writes can
+        # share an mtime tick on Windows and incorrectly reuse a cached fixture.
+        replacement = path.with_suffix(".tmp")
+        replacement.write_text(
+            json.dumps({"schemaVersion": 1, "enforcedUsers": ["owner"], "declarations": [declaration]})
+        )
+        replacement.replace(path)
 
     return write
 
@@ -87,11 +93,67 @@ def test_json_data_profile_exposes_limits_and_requires_matching_category(policy)
     assert error.value.code == "CAPABILITY_DECLARATION_INVALID"
 
 
+def test_service_read_profile_exposes_component_operations_and_transports(policy):
+    workflow = Workflow(project_id="p", user_id="owner", version=1, parameters="[]")
+    policy(
+        workflow,
+        capabilities=["service-http-read"],
+        capabilityClass="service-http-read",
+        componentOperations=["Network.http_request"],
+        allowedTransports=["mcp", "rest"],
+        readOnlyReview={
+            "version": 1,
+            "boundedResources": True,
+            "readOnlyConnections": True,
+            "operationInputs": {"Network.http_request": {"request_type": "get", "file_path": "", "save_type": "no"}},
+        },
+    )
+    profile = workflow_profile(workflow, "owner")
+    assert profile["admission"]["allowed"] is True
+    assert profile["componentOperations"] == ["Network.http_request"]
+    assert profile["allowedTransports"] == ["mcp", "rest"]
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"componentOperations": None},
+        {"componentOperations": ["Network.ftp_upload"]},
+        {"requiresGui": True},
+        {"requiresHuman": True},
+        {"sideEffects": ["external-write"]},
+    ],
+)
+def test_service_read_profile_rejects_incomplete_or_writing_shape(policy, change):
+    workflow = Workflow(project_id="p", user_id="owner", version=1, parameters="[]")
+    declaration = {
+        "capabilities": ["service-http-read"],
+        "capabilityClass": "service-http-read",
+        "componentOperations": ["Network.http_request"],
+        "allowedTransports": ["mcp"],
+        "readOnlyReview": {
+            "version": 1,
+            "boundedResources": True,
+            "readOnlyConnections": True,
+            "operationInputs": {"Network.http_request": {"request_type": "get", "file_path": "", "save_type": "no"}},
+        },
+    }
+    declaration.update(change)
+    policy(workflow, **declaration)
+    with pytest.raises(WorkflowAccessError) as error:
+        require_admission(workflow, "owner")
+    assert error.value.code in {"PROFILE_INCOMPLETE", "CAPABILITY_DECLARATION_INVALID"}
+
+
 @pytest.mark.parametrize(
     "change",
     [
         {"capabilities": ["json-data"], "capabilityClass": "json-data", "fileInputs": True},
         {"capabilities": ["json-data"], "capabilityClass": "json-data", "requiresGui": True},
+        {"capabilities": ["json-data"], "capabilityClass": "json-data", "requiresHuman": True},
+        {"capabilities": ["json-data"], "capabilityClass": "json-data", "risk": "medium"},
+        {"capabilities": ["json-data"], "capabilityClass": "json-data", "risk": "high"},
+        {"capabilities": ["json-data"], "capabilityClass": "json-data", "sideEffects": ["external-write"]},
         {
             "capabilities": ["json-data"],
             "capabilityClass": "json-data",

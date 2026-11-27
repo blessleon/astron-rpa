@@ -28,6 +28,11 @@ CLIENT_STATES = {
     "unknown": "UNKNOWN",
 }
 ERRORS = {
+    "RISK_OPERATION_DENIED",
+    "RISK_ARGUMENTS_DENIED",
+    "RISK_CODE_DENIED",
+    "RISK_AUDIT_FAILED",
+    "RISK_CONTRACT_INVALID",
     "CLIENT_BUSY",
     "CLIENT_OFFLINE",
     "EXECUTION_FAILED",
@@ -40,6 +45,17 @@ ERRORS = {
     "CANCEL_UNSUPPORTED",
     "DISPATCH_EXPIRED",
     "STOP_UNCONFIRMED",
+    "FILE_TRANSFER_FAILED",
+    "FILE_OUTPUT_INVALID",
+    "OFFICE_UNAVAILABLE",
+    "DESKTOP_UNAVAILABLE",
+    "DESKTOP_LOCKED",
+    "DESKTOP_SESSION_CHANGED",
+    "DESKTOP_RESOLUTION_MISMATCH",
+    "DESKTOP_SOFTWARE_UNAVAILABLE",
+    "DESKTOP_POPUP_BLOCKED",
+    "DESKTOP_CONTRACT_INVALID",
+    "DESKTOP_HUMAN_UNAVAILABLE",
 }
 
 
@@ -54,6 +70,11 @@ def _validate_data_result(record, value):
         limits = contract.get("limits")
         validate_json_value(value, limits=limits)
         schema = contract.get("outputSchema")
+        if contract.get("fileContract"):
+            from app.services.office_file import validate_file_result
+
+            if not validate_file_result(record, contract["fileContract"], value):
+                return False
         if schema is not None:
             Draft202012Validator(schema).validate(value)
         return True
@@ -183,6 +204,23 @@ async def apply_receipt(service, record, receipt):
     result = await service.db.execute(statement.values(**values))
     await service.db.commit()
     await service.db.refresh(record)
+    if result.rowcount and status in TERMINAL:
+        from app.services.observability import event, execution_finished, increment
+
+        execution_finished(status, code, (finished - started).total_seconds() if started and finished else None)
+        if code == "CLIENT_BUSY":
+            increment("astron_client_busy_total")
+        event(
+            "execution_terminal",
+            execution_id=record.id,
+            run_id=record.run_id,
+            outcome=status,
+            error_code=code if code in ERRORS else None,
+        )
+    if record.status in TERMINAL and record.data_contract and json.loads(record.data_contract).get("fileContract"):
+        from app.services.integration_files import store
+
+        store().revoke(record.id)
     return bool(result.rowcount)
 
 
@@ -202,6 +240,22 @@ async def reconcile(service, record):
         )
         await service.db.commit()
         if claimed.rowcount:
+            # Only the atomic NEW -> SENT claim creates a file bundle. Later
+            # reconcile passes observe SENT and query the existing execution,
+            # so they do not accumulate additional transfer grants.
+            bundle = None
+            contract = json.loads(record.data_contract or "{}")
+            if contract.get("fileContract"):
+                from app.services.office_file import execution_bundle
+
+                try:
+                    bundle = execution_bundle(record, contract["fileContract"])
+                except WorkflowAccessError:
+                    from app.services.integration_files import store
+
+                    store().revoke(record.id)
+                    await service.update_execution_status(record.id, "FAILED", error="FILE_TRANSFER_FAILED")
+                    return
             command.update(
                 action="start",
                 payload={
@@ -211,6 +265,9 @@ async def reconcile(service, record):
                     "executionTimeout": record.execution_timeout,
                     "recordingConfig": record.recording_config,
                     "secretFields": json.loads(record.secret_fields or "[]"),
+                    **({"fileBundle": bundle} if bundle else {}),
+                    **({"desktopContract": contract["desktopContract"]} if contract.get("desktopContract") else {}),
+                    **({"riskContract": contract["riskContract"]} if contract.get("riskContract") else {}),
                 },
             )
     try:
@@ -242,18 +299,27 @@ async def recover_executions():
     from app.database import AsyncSessionLocal
     from app.services.execution import ExecutionService, _execution_task_done, _execution_tasks
 
+    cursor = ""
+    observing = set()
     while True:
         try:
+            if len(observing) >= 32:
+                await asyncio.sleep(2)
+                continue
             async with AsyncSessionLocal() as db:
                 ids = (
                     (
                         await db.execute(
-                            select(Execution.id).where(Execution.protocol == 1, Execution.status.not_in(TERMINAL))
+                            select(Execution.id)
+                            .where(Execution.protocol == 1, Execution.status.not_in(TERMINAL), Execution.id > cursor)
+                            .order_by(Execution.id)
+                            .limit(32 - len(observing))
                         )
                     )
                     .scalars()
                     .all()
                 )
+            cursor = ids[-1] if ids else ""
             active = {task.get_name() for task in _execution_tasks}
             for execution_id in ids:
                 name = f"execution-{execution_id}"
@@ -268,6 +334,8 @@ async def recover_executions():
                             await reconcile(service, record)
 
                 task = asyncio.create_task(observe(), name=name)
+                observing.add(task)
+                task.add_done_callback(observing.discard)
                 _execution_tasks.add(task)
                 task.add_done_callback(_execution_task_done)
         except Exception:
